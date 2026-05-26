@@ -20,11 +20,12 @@ pnpm dev
 Open `http://localhost:3000`.
 
 To enable Clerk locally, copy `.env.example` to `.env.local` and fill in your Clerk keys.
+For Neon + Prisma, also set `DATABASE_URL` to the pooled Neon connection string and `DIRECT_URL` to the direct connection string for Prisma CLI usage.
 
 ## Next Implementation Areas
 
-- Clerk route protection and role-aware access
 - Role-aware access rules
-- Database schema and persistence
+- Prisma migrations and Neon connection
+- Database persistence for clients and records
 - Secret encryption helpers
 - Record CRUD and audit logging

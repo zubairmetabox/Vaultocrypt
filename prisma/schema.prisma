@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AppRole {
+  ADMIN
+  PROJECT_MANAGER
+  USER
+}
+
+enum ClientStatus {
+  ACTIVE
+  RESTRICTED
+  NEEDS_REVIEW
+}
+
+enum RecordType {
+  CREDENTIAL
+  SECURE_NOTE
+}
+
+enum AuditAction {
+  LOGIN
+  FAILED_LOGIN
+  CLIENT_CREATED
+  CLIENT_UPDATED
+  CLIENT_DELETED
+  RECORD_CREATED
+  RECORD_UPDATED
+  RECORD_DELETED
+  SECRET_REVEALED
+  SECRET_COPIED
+  ROLE_CHANGED
+  RESTRICTION_CHANGED
+}
+
+model User {
+  id          String       @id @default(cuid())
+  clerkUserId String       @unique
+  email       String?      @unique
+  firstName   String?
+  lastName    String?
+  role        AppRole      @default(USER)
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  auditEvents AuditEvent[]
+}
+
+model Client {
+  id          String       @id @default(cuid())
+  name        String
+  contact     String?
+  vertical    String?
+  notes       String?
+  status      ClientStatus @default(ACTIVE)
+  isRestricted Boolean     @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  records     Record[]
+  tags        Tag[]        @relation("ClientTags")
+  auditEvents AuditEvent[]
+}
+
+model Record {
+  id            String       @id @default(cuid())
+  clientId      String
+  title         String
+  type          RecordType
+  serviceName   String?
+  url           String?
+  username      String?
+  secretCipher  String?
+  notes         String?
+  isRestricted  Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  createdById   String?
+  updatedById   String?
+  client        Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tags          Tag[]        @relation("RecordTags")
+  auditEvents   AuditEvent[]
+
+  @@index([clientId])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  clients   Client[] @relation("ClientTags")
+  records   Record[] @relation("RecordTags")
+}
+
+model AuditEvent {
+  id         String      @id @default(cuid())
+  action     AuditAction
+  resource   String
+  resourceId String
+  metadata   Json?
+  createdAt  DateTime    @default(now())
+  actorId    String?
+  clientId   String?
+  recordId   String?
+  actor      User?       @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  client     Client?     @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  record     Record?     @relation(fields: [recordId], references: [id], onDelete: SetNull)
+
+  @@index([action, createdAt])
+  @@index([resource, resourceId])
+  @@index([actorId])
+  @@index([clientId])
+  @@index([recordId])
+}

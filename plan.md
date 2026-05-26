@@ -78,35 +78,35 @@ The goal of v1 is not public SaaS readiness. The goal is real weekly internal us
 ### Tasks
 
 - [x] Integrate `Clerk` with email/password authentication
-- [ ] Protect authenticated routes
-- [ ] Define v1 roles: `admin`, `editor`, `viewer`
+- [x] Protect authenticated routes
+- [x] Define v1 roles: `Admin`, `Project Manager`, `User`
 - [ ] Add basic role-aware UI visibility rules
 - [ ] Establish an internal authorization layer for role checks
 
 ### Deliverables
 
-- [ ] Working sign-in and protected app routes
-- [ ] Role model available in app logic
+- [x] Working sign-in and protected app routes
+- [x] Role model available in app logic
 - [ ] Simple access-aware UI states
 
 ## Phase 4: Data Model And Security Core
 
 ### Tasks
 
-- [ ] Define the initial database schema
-- [ ] Create core entities:
+- [x] Define the initial database schema
+- [x] Create core entities:
   `User`, `UserRole`, `Client`, `Record`, `Tag`, `AuditEvent`
-- [ ] Define v1 record fields:
+- [x] Define v1 record fields:
   `title`, `service_name`, `url`, `username`, `secret_value`, `notes`, `tags`, timestamps, actor metadata
 - [ ] Add encryption helpers for secret-bearing fields
 - [ ] Separate standard record reads from reveal/copy actions
-- [ ] Define audit event types for sensitive actions
+- [x] Define audit event types for sensitive actions
 
 ### Deliverables
 
-- [ ] Initial schema ready for persistence work
+- [x] Initial schema ready for persistence work
 - [ ] Encryption utilities in place
-- [ ] Audit model ready for feature integration
+- [x] Audit model ready for feature integration
 
 ## Phase 5: Client Directory And Client Pages
 
@@ -195,9 +195,9 @@ The goal of v1 is not public SaaS readiness. The goal is real weekly internal us
 
 ### Roles
 
-- [ ] `admin`
-- [ ] `editor`
-- [ ] `viewer`
+- [x] `Admin`
+- [x] `Project Manager`
+- [x] `User`
 
 ### Record Types
 
@@ -229,7 +229,7 @@ These actions must be treated as privileged and audited:
 1. [x] Replace planning draft with this implementation plan
 2. [x] Scaffold the app foundation
 3. [x] Build the app shell
-4. [ ] Integrate authentication
+4. [x] Integrate authentication
 5. [ ] Add data model and encryption core
 6. [x] Build client management
 7. [ ] Build record management

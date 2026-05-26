@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, Search, Settings2 } from "lucide-react";
+import { Menu, Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { HeaderAuth } from "@/components/app/header-auth";
@@ -73,11 +73,6 @@ export function WorkspaceShell({
                 </div>
 
                 <div className="ml-auto flex items-center gap-2">
-                  <Button variant="outline" size="icon-sm" asChild>
-                    <a href="/settings" aria-label="Open settings">
-                      <Settings2 className="size-4" />
-                    </a>
-                  </Button>
                   <HeaderAuth clerkEnabled={clerkEnabled} />
                 </div>
               </div>

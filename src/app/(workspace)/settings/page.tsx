@@ -2,6 +2,7 @@ import { LockKeyhole, Shield, SunMoon, Users } from "lucide-react";
 
 import { ThemeToggle } from "@/components/app/theme-toggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { APP_ROLE_LABELS, APP_ROLES } from "@/lib/auth/roles";
 
 const settingsCards = [
   {
@@ -11,7 +12,7 @@ const settingsCards = [
   },
   {
     title: "Roles",
-    copy: "Admin, editor, and viewer controls will live here as the authorization layer is added.",
+    copy: "Admin, Project Manager, and User controls will live here as the authorization layer is added.",
     icon: Users,
   },
   {
@@ -58,6 +59,18 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm leading-6 text-muted-foreground">{card.copy}</p>
+                {card.title === "Roles" ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {APP_ROLES.map((role) => (
+                      <span
+                        key={role}
+                        className="rounded-full border border-border/70 bg-card px-3 py-1 text-xs text-muted-foreground"
+                      >
+                        {APP_ROLE_LABELS[role]}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           );

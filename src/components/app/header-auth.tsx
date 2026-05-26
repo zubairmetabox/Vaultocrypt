@@ -56,17 +56,13 @@ function ConfiguredHeaderAuth() {
 
   return (
     <div className="hidden items-center gap-3 sm:flex">
-      <div className="flex items-center gap-3 rounded-[1.25rem] border border-border/70 bg-muted/50 px-3 py-2">
-        <div className="text-right">
-          <p className="text-sm font-medium text-foreground">MetaBox Team</p>
-          <p className="text-xs text-muted-foreground">
-            Internal workspace, v1 foundation
-          </p>
-        </div>
+      <div className="flex h-11 w-11 items-center justify-center rounded-full border border-border/70 bg-card/70 shadow-sm">
         <UserButton
           appearance={{
             elements: {
-              avatarBox: "size-10",
+              avatarBox: "size-8 ring-0 shadow-none",
+              userButtonTrigger:
+                "flex size-full items-center justify-center rounded-full p-0",
             },
           }}
         />

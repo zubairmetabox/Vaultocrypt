@@ -1,4 +1,5 @@
 import { ClerkProvider } from "@clerk/nextjs";
+import { shadcn } from "@clerk/ui/themes";
 
 type AuthProviderProps = {
   children: React.ReactNode;
@@ -13,5 +14,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return children;
   }
 
-  return <ClerkProvider>{children}</ClerkProvider>;
+  return (
+    <ClerkProvider
+      appearance={{ theme: shadcn }}
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
+      afterSignOutUrl="/sign-in"
+    >
+      {children}
+    </ClerkProvider>
+  );
 }
