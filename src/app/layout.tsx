@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthProvider } from "@/components/auth-provider";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
@@ -18,6 +19,24 @@ export const metadata: Metadata = {
   description: "Internal client credential workspace for MetaBox Technology.",
 };
 
+const themeInitScript = `
+(() => {
+  const storageKey = "vaultocrypt-theme";
+  const root = document.documentElement;
+  const storedTheme = localStorage.getItem(storageKey);
+  const theme =
+    storedTheme === "light" || storedTheme === "dark" || storedTheme === "system"
+      ? storedTheme
+      : "system";
+  const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+  const resolvedTheme = theme === "system" ? systemTheme : theme;
+  root.classList.toggle("dark", resolvedTheme === "dark");
+  root.style.colorScheme = resolvedTheme;
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -29,8 +48,13 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="min-h-full font-sans text-foreground">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -5,5 +5,9 @@ export default function WorkspaceLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <WorkspaceShell>{children}</WorkspaceShell>;
+  const clerkEnabled = Boolean(
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY,
+  );
+
+  return <WorkspaceShell clerkEnabled={clerkEnabled}>{children}</WorkspaceShell>;
 }

@@ -28,7 +28,7 @@ The goal of v1 is not public SaaS readiness. The goal is real weekly internal us
 - [x] Brand presence: subtle and professional
 - [x] Density: comfortable
 - [x] Navigation: left sidebar app shell
-- [x] Main sections: `Clients`, `Activity`, `Search`, `Settings`
+- [x] Main sections: `Clients`, `Activity`, `Settings`
 - [x] Main landing screen after login: client directory
 - [x] Client detail page: lean client header with basic details, then records immediately
 - [x] Record presentation: table/list hybrid
@@ -46,8 +46,8 @@ The goal of v1 is not public SaaS readiness. The goal is real weekly internal us
 - [x] Create the `Next.js` app with TypeScript, Tailwind, and App Router
 - [x] Install and apply the `shadcn` Luma preset
 - [x] Establish a clean base layout and route structure
-- [ ] Add project-level configuration for environment variables
-- [ ] Add placeholder auth boundary structure for future `Clerk` integration
+- [x] Add project-level configuration for environment variables
+- [x] Add placeholder auth boundary structure for future `Clerk` integration
 - [x] Prepare a basic design-token friendly CSS foundation using the preset
 
 ### Deliverables
@@ -62,7 +62,7 @@ The goal of v1 is not public SaaS readiness. The goal is real weekly internal us
 ### Tasks
 
 - [x] Build the authenticated app shell with a left sidebar
-- [x] Create sidebar destinations for `Clients`, `Activity`, `Search`, and `Settings`
+- [x] Create sidebar destinations for `Clients`, `Activity`, and `Settings`
 - [x] Build responsive behavior for desktop and mobile navigation
 - [ ] Add empty states for first-use flows
 - [x] Add polished page framing and state transitions
@@ -77,7 +77,7 @@ The goal of v1 is not public SaaS readiness. The goal is real weekly internal us
 
 ### Tasks
 
-- [ ] Integrate `Clerk` with email/password authentication
+- [x] Integrate `Clerk` with email/password authentication
 - [ ] Protect authenticated routes
 - [ ] Define v1 roles: `admin`, `editor`, `viewer`
 - [ ] Add basic role-aware UI visibility rules

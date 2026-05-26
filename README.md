@@ -19,9 +19,11 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
+To enable Clerk locally, copy `.env.example` to `.env.local` and fill in your Clerk keys.
+
 ## Next Implementation Areas
 
-- Clerk authentication
+- Clerk route protection and role-aware access
 - Role-aware access rules
 - Database schema and persistence
 - Secret encryption helpers

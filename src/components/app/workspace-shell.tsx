@@ -1,8 +1,9 @@
 "use client";
 
-import { Menu } from "lucide-react";
+import { Menu, Search, Settings2 } from "lucide-react";
 import { usePathname } from "next/navigation";
 
+import { HeaderAuth } from "@/components/app/header-auth";
 import { Sidebar } from "@/components/app/sidebar";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,21 +13,27 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 type WorkspaceShellProps = {
   children: React.ReactNode;
+  clerkEnabled: boolean;
 };
 
-const pageMeta: Record<string, { title: string; eyebrow: string }> = {
-  "/": { title: "Client Directory", eyebrow: "Vaultocrypt v1" },
+const pageMeta: Record<string, { title: string; eyebrow?: string }> = {
+  "/": { title: "Client Directory" },
   "/activity": { title: "Activity", eyebrow: "Visible audit posture" },
-  "/search": { title: "Search", eyebrow: "Fast secondary access" },
   "/settings": { title: "Settings", eyebrow: "Preferences and controls" },
 };
 
-export function WorkspaceShell({ children }: WorkspaceShellProps) {
+export function WorkspaceShell({
+  children,
+  clerkEnabled,
+}: WorkspaceShellProps) {
   const pathname = usePathname();
-  const currentPage = pageMeta[pathname] ?? pageMeta["/"];
+  const currentPage = pathname.startsWith("/clients/")
+    ? { title: "Client", eyebrow: "Records and access" }
+    : (pageMeta[pathname] ?? pageMeta["/"]);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--app-shell-bg)" }}>
@@ -35,46 +42,60 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
           <Sidebar pathname={pathname} />
         </div>
 
-        <div className="flex min-h-[calc(100vh-1.5rem)] flex-col rounded-[2rem] border border-border/80 bg-background/88 shadow-[0_30px_100px_-50px_rgba(15,23,42,0.45)] backdrop-blur">
-          <header className="flex items-center justify-between gap-4 border-b border-border/70 px-4 py-4 sm:px-6">
-            <div className="flex items-center gap-3">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="icon-sm" className="lg:hidden">
-                    <Menu className="size-4" />
-                    <span className="sr-only">Open navigation</span>
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-xs p-3">
-                  <DialogTitle className="sr-only">Navigation</DialogTitle>
-                  <DialogDescription className="sr-only">
-                    Workspace navigation
-                  </DialogDescription>
-                  <Sidebar pathname={pathname} />
-                </DialogContent>
-              </Dialog>
+        <div className="flex h-[calc(100vh-1.5rem)] min-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[2rem] border border-border/80 bg-background/88 shadow-[0_30px_100px_-50px_rgba(15,23,42,0.45)] backdrop-blur">
+          <header className="sticky top-0 z-20 border-b border-border/70 bg-background/88 px-4 py-4 backdrop-blur sm:px-6">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-3">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="icon-sm" className="lg:hidden">
+                      <Menu className="size-4" />
+                      <span className="sr-only">Open navigation</span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-xs p-3">
+                    <DialogTitle className="sr-only">Navigation</DialogTitle>
+                    <DialogDescription className="sr-only">
+                      Workspace navigation
+                    </DialogDescription>
+                    <Sidebar pathname={pathname} />
+                  </DialogContent>
+                </Dialog>
 
-              <div>
-                <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">
-                  {currentPage.eyebrow}
-                </p>
+                <div className="hidden min-w-0 flex-1 items-center lg:flex">
+                  <div className="flex w-full max-w-xl items-center gap-2 rounded-[1.25rem] border border-border/70 bg-card/70 px-3 py-2 shadow-sm">
+                    <Search className="size-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search clients, records, and notes"
+                      className="h-auto border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0"
+                    />
+                  </div>
+                </div>
+
+                <div className="ml-auto flex items-center gap-2">
+                  <Button variant="outline" size="icon-sm" asChild>
+                    <a href="/settings" aria-label="Open settings">
+                      <Settings2 className="size-4" />
+                    </a>
+                  </Button>
+                  <HeaderAuth clerkEnabled={clerkEnabled} />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                {currentPage.eyebrow ? (
+                  <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">
+                    {currentPage.eyebrow}
+                  </p>
+                ) : null}
                 <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
                   {currentPage.title}
                 </h1>
               </div>
             </div>
-
-            <div className="hidden items-center gap-3 rounded-[1.25rem] border border-border/70 bg-muted/50 px-3 py-2 sm:flex">
-              <div className="text-right">
-                <p className="text-sm font-medium text-foreground">MetaBox Team</p>
-                <p className="text-xs text-muted-foreground">
-                  Internal workspace, v1 foundation
-                </p>
-              </div>
-            </div>
           </header>
 
-          <main className="flex-1 p-4 sm:p-6">{children}</main>
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
         </div>
       </div>
     </div>
