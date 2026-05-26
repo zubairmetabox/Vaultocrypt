@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Menu, Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 
@@ -14,6 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { getClientById } from "@/lib/mock-data";
 
 type WorkspaceShellProps = {
   children: React.ReactNode;
@@ -31,8 +33,12 @@ export function WorkspaceShell({
   clerkEnabled,
 }: WorkspaceShellProps) {
   const pathname = usePathname();
+  const clientId = pathname.startsWith("/clients/")
+    ? pathname.split("/")[2]
+    : null;
+  const currentClient = clientId ? getClientById(clientId) : null;
   const currentPage = pathname.startsWith("/clients/")
-    ? { title: "Client", eyebrow: "Records and access" }
+    ? { title: currentClient?.name ?? "Client", eyebrow: undefined }
     : (pageMeta[pathname] ?? pageMeta["/"]);
 
   return (
@@ -78,7 +84,18 @@ export function WorkspaceShell({
               </div>
 
               <div className="flex flex-col gap-1">
-                {currentPage.eyebrow ? (
+                {pathname.startsWith("/clients/") ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Link
+                      href="/"
+                      className="transition-colors duration-200 hover:text-foreground"
+                    >
+                      Clients
+                    </Link>
+                    <span>/</span>
+                    <span className="text-foreground">{currentPage.title}</span>
+                  </div>
+                ) : currentPage.eyebrow ? (
                   <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">
                     {currentPage.eyebrow}
                   </p>
