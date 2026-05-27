@@ -17,11 +17,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useClientTitle } from "@/contexts/client-title";
-import { getClientById } from "@/lib/mock-data";
+import type { ClientRow } from "@/lib/actions/clients";
 
 type WorkspaceShellProps = {
   children: React.ReactNode;
   clerkEnabled: boolean;
+  clients: ClientRow[];
 };
 
 const pageMeta: Record<string, { title: string; eyebrow?: string }> = {
@@ -30,18 +31,12 @@ const pageMeta: Record<string, { title: string; eyebrow?: string }> = {
   "/settings": { title: "Settings", eyebrow: "Preferences and controls" },
 };
 
-export function WorkspaceShell({
-  children,
-  clerkEnabled,
-}: WorkspaceShellProps) {
+export function WorkspaceShell({ children, clerkEnabled, clients }: WorkspaceShellProps) {
   const pathname = usePathname();
   const clientTitle = useClientTitle();
-  const clientId = pathname.startsWith("/clients/")
-    ? pathname.split("/")[2]
-    : null;
-  const currentClient = clientId ? getClientById(clientId) : null;
+
   const currentPage = pathname.startsWith("/clients/")
-    ? { title: clientTitle ?? currentClient?.name ?? "Client", eyebrow: undefined }
+    ? { title: clientTitle ?? "Client", eyebrow: undefined }
     : (pageMeta[pathname] ?? pageMeta["/"]);
 
   return (
@@ -51,7 +46,7 @@ export function WorkspaceShell({
     >
       <div className="mx-auto grid h-full max-w-[1820px] gap-4 p-3 sm:p-4 lg:grid-cols-[280px_1fr]">
         <div className="hidden h-full lg:block">
-          <Sidebar pathname={pathname} />
+          <Sidebar pathname={pathname} clients={clients} />
         </div>
 
         <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2rem] border border-border/80 bg-background shadow-[0_30px_100px_-50px_rgba(15,23,42,0.45)]">
@@ -71,7 +66,7 @@ export function WorkspaceShell({
                       Workspace navigation
                     </DialogDescription>
                     <DialogBody className="p-3">
-                      <Sidebar pathname={pathname} />
+                      <Sidebar pathname={pathname} clients={clients} />
                     </DialogBody>
                   </DialogContent>
                 </Dialog>

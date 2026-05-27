@@ -1,6 +1,7 @@
 import { WorkspaceShell } from "@/components/app/workspace-shell";
+import { getClients } from "@/lib/actions/clients";
 
-export default function WorkspaceLayout({
+export default async function WorkspaceLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -9,5 +10,11 @@ export default function WorkspaceLayout({
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY,
   );
 
-  return <WorkspaceShell clerkEnabled={clerkEnabled}>{children}</WorkspaceShell>;
+  const clients = await getClients();
+
+  return (
+    <WorkspaceShell clerkEnabled={clerkEnabled} clients={clients}>
+      {children}
+    </WorkspaceShell>
+  );
 }
