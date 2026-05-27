@@ -27,6 +27,11 @@ enum RecordType {
   SECURE_NOTE
 }
 
+enum RecordSensitivity {
+  STANDARD
+  SENSITIVE
+}
+
 enum AuditAction {
   LOGIN
   FAILED_LOGIN
@@ -81,7 +86,8 @@ model Record {
   username      String?
   secretCipher  String?
   notes         String?
-  isRestricted  Boolean      @default(false)
+  sensitivity   RecordSensitivity @default(SENSITIVE)
+  isRestricted  Boolean           @default(false)
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   createdById   String?

@@ -45,6 +45,11 @@ export async function getClients(): Promise<ClientRow[]> {
   }));
 }
 
+export async function getClientName(clientId: string): Promise<string | null> {
+  const row = await db.client.findUnique({ where: { id: clientId }, select: { name: true } });
+  return row?.name ?? null;
+}
+
 export async function getClientWithRecords(clientId: string) {
   return db.client.findUnique({
     where: { id: clientId },
@@ -59,6 +64,7 @@ export async function getClientWithRecords(clientId: string) {
           url: true,
           username: true,
           notes: true,
+          sensitivity: true,
           isRestricted: true,
           createdAt: true,
           updatedAt: true,

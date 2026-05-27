@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   Check,
   ClipboardCheck,
@@ -8,6 +9,7 @@ import {
   Eye,
   EyeOff,
   KeyRound,
+  Loader2,
   PencilLine,
   Plus,
   StickyNote,
@@ -26,52 +28,76 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  createRecord,
+  deleteRecord,
+  revealSecret,
+  updateRecord,
+} from "@/lib/actions/records";
 import type { VaultRecord } from "@/lib/mock-data";
 
 type RecordListProps = {
+  clientId: string;
   initialRecords: VaultRecord[];
 };
 
 type DeleteTarget = { id: string; title: string } | null;
 
-let nextId = 10000;
-function generateId() {
-  return `rec-new-${nextId++}`;
-}
+export function RecordList({ clientId, initialRecords }: RecordListProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
-export function RecordList({ initialRecords }: RecordListProps) {
+  // Keep local copy in sync when server refreshes props
   const [records, setRecords] = useState<VaultRecord[]>(initialRecords);
-  const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
+  useEffect(() => { setRecords(initialRecords); }, [initialRecords]);
+
+  // Revealed secrets stored client-side only (never in the initial render)
+  const [revealedSecrets, setRevealedSecrets] = useState<Map<string, string>>(new Map());
+  const [revealingId, setRevealingId] = useState<string | null>(null);
+
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editRecord, setEditRecord] = useState<VaultRecord | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function toggleReveal(id: string) {
-    setRevealedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+  // ── Reveal ────────────────────────────────────────────────────────────────
+
+  async function handleReveal(record: VaultRecord) {
+    if (revealedSecrets.has(record.id)) {
+      // Hide
+      setRevealedSecrets((prev) => {
+        const next = new Map(prev);
+        next.delete(record.id);
+        return next;
+      });
+      return;
+    }
+    setRevealingId(record.id);
+    try {
+      const secret = await revealSecret(record.id);
+      setRevealedSecrets((prev) => new Map(prev).set(record.id, secret));
+    } finally {
+      setRevealingId(null);
+    }
   }
 
+  // ── Copy ──────────────────────────────────────────────────────────────────
+
   const handleCopy = useCallback(async (record: VaultRecord) => {
-    const value = record.type === "credential" ? record.secretValue : record.notes;
+    let value = revealedSecrets.get(record.id);
+    if (!value) {
+      // Fetch secret silently without showing it
+      value = await revealSecret(record.id);
+    }
     if (!value) return;
 
     try {
       await navigator.clipboard.writeText(value);
     } catch {
-      // Fallback for non-secure contexts
       const el = document.createElement("textarea");
       el.value = value;
-      el.style.position = "fixed";
-      el.style.opacity = "0";
+      el.style.cssText = "position:fixed;opacity:0";
       document.body.appendChild(el);
       el.select();
       document.execCommand("copy");
@@ -81,38 +107,62 @@ export function RecordList({ initialRecords }: RecordListProps) {
     if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     setCopiedId(record.id);
     copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 2000);
-  }, []);
+  }, [revealedSecrets]);
+
+  // ── Create ────────────────────────────────────────────────────────────────
 
   function handleSaveNew(draft: Omit<VaultRecord, "id" | "lastUpdated">) {
-    const newRecord: VaultRecord = {
-      ...draft,
-      id: generateId(),
-      lastUpdated: "Just now",
-    };
-    setRecords((prev) => [...prev, newRecord]);
+    startTransition(async () => {
+      await createRecord({
+        clientId,
+        title: draft.title,
+        type: draft.type === "credential" ? "CREDENTIAL" : "SECURE_NOTE",
+        serviceName: draft.service,
+        url: draft.url,
+        username: draft.username,
+        secretValue: draft.secretValue,
+        notes: draft.notes,
+        sensitivity: draft.sensitivity === "Sensitive" ? "SENSITIVE" : "STANDARD",
+      });
+      setCreateOpen(false);
+      router.refresh();
+    });
   }
+
+  // ── Edit ──────────────────────────────────────────────────────────────────
 
   function handleSaveEdit(draft: Omit<VaultRecord, "id" | "lastUpdated">) {
     if (!editRecord) return;
-    setRecords((prev) =>
-      prev.map((r) =>
-        r.id === editRecord.id
-          ? { ...r, ...draft, lastUpdated: "Just now" }
-          : r,
-      ),
-    );
-    setEditRecord(null);
+    startTransition(async () => {
+      await updateRecord(editRecord.id, clientId, {
+        title: draft.title,
+        type: draft.type === "credential" ? "CREDENTIAL" : "SECURE_NOTE",
+        serviceName: draft.service,
+        url: draft.url,
+        username: draft.username,
+        secretValue: draft.secretValue || undefined,
+        notes: draft.notes,
+        sensitivity: draft.sensitivity === "Sensitive" ? "SENSITIVE" : "STANDARD",
+      });
+      setEditRecord(null);
+      router.refresh();
+    });
   }
+
+  // ── Delete ────────────────────────────────────────────────────────────────
 
   function handleDelete() {
     if (!deleteTarget) return;
-    setRecords((prev) => prev.filter((r) => r.id !== deleteTarget.id));
-    setRevealedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(deleteTarget.id);
-      return next;
+    startTransition(async () => {
+      await deleteRecord(deleteTarget.id, clientId);
+      setRevealedSecrets((prev) => {
+        const next = new Map(prev);
+        next.delete(deleteTarget.id);
+        return next;
+      });
+      setDeleteTarget(null);
+      router.refresh();
     });
-    setDeleteTarget(null);
   }
 
   return (
@@ -145,11 +195,13 @@ export function RecordList({ initialRecords }: RecordListProps) {
             </div>
           ) : (
             records.map((record) => {
-              const isRevealed = revealedIds.has(record.id);
+              const secret = revealedSecrets.get(record.id);
+              const isRevealed = secret !== undefined;
+              const isRevealing = revealingId === record.id;
               const isCopied = copiedId === record.id;
               const isNote = record.type === "secure_note";
               const secretDisplay = isRevealed
-                ? (isNote ? record.notes : record.secretValue) || "—"
+                ? (secret || "—")
                 : "•".repeat(18);
 
               return (
@@ -159,7 +211,6 @@ export function RecordList({ initialRecords }: RecordListProps) {
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 flex-1 space-y-1.5">
-                      {/* Header row */}
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-muted">
                           {isNote ? (
@@ -180,13 +231,11 @@ export function RecordList({ initialRecords }: RecordListProps) {
                         </Badge>
                       </div>
 
-                      {/* Service / username */}
                       <p className="text-sm text-muted-foreground">
                         {record.service}
                         {!isNote && record.username ? ` · ${record.username}` : ""}
                       </p>
 
-                      {/* Secret or note preview */}
                       <div className="flex items-center gap-2">
                         <code
                           className={`rounded-lg border border-border/50 bg-muted/60 px-2.5 py-1 text-xs ${
@@ -206,24 +255,19 @@ export function RecordList({ initialRecords }: RecordListProps) {
                       </p>
                     </div>
 
-                    {/* Actions */}
                     <div className="flex flex-wrap items-center gap-2">
                       <Button
                         size="sm"
                         variant={isRevealed ? "default" : "outline"}
-                        onClick={() => toggleReveal(record.id)}
-                        className="transition-all"
+                        onClick={() => handleReveal(record)}
+                        disabled={isRevealing}
                       >
-                        {isRevealed ? (
-                          <>
-                            <EyeOff className="size-4" />
-                            Hide
-                          </>
+                        {isRevealing ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : isRevealed ? (
+                          <><EyeOff className="size-4" /> Hide</>
                         ) : (
-                          <>
-                            <Eye className="size-4" />
-                            Reveal
-                          </>
+                          <><Eye className="size-4" /> Reveal</>
                         )}
                       </Button>
 
@@ -231,21 +275,12 @@ export function RecordList({ initialRecords }: RecordListProps) {
                         size="sm"
                         variant="outline"
                         onClick={() => handleCopy(record)}
-                        disabled={
-                          isNote ? !record.notes : !record.secretValue
-                        }
                         className="transition-all"
                       >
                         {isCopied ? (
-                          <>
-                            <ClipboardCheck className="size-4 text-primary" />
-                            Copied
-                          </>
+                          <><ClipboardCheck className="size-4 text-primary" /> Copied</>
                         ) : (
-                          <>
-                            <Copy className="size-4" />
-                            Copy
-                          </>
+                          <><Copy className="size-4" /> Copy</>
                         )}
                       </Button>
 
@@ -262,9 +297,7 @@ export function RecordList({ initialRecords }: RecordListProps) {
                         size="sm"
                         variant="ghost"
                         className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() =>
-                          setDeleteTarget({ id: record.id, title: record.title })
-                        }
+                        onClick={() => setDeleteTarget({ id: record.id, title: record.title })}
                       >
                         <Trash2 className="size-4" />
                       </Button>
@@ -277,19 +310,17 @@ export function RecordList({ initialRecords }: RecordListProps) {
         </CardContent>
       </Card>
 
-      {/* Create dialog */}
+      {/* Create */}
       <RecordFormDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
         onSave={handleSaveNew}
       />
 
-      {/* Edit dialog */}
+      {/* Edit */}
       <RecordFormDialog
         open={Boolean(editRecord)}
-        onOpenChange={(open) => {
-          if (!open) setEditRecord(null);
-        }}
+        onOpenChange={(o) => { if (!o) setEditRecord(null); }}
         record={editRecord ?? undefined}
         onSave={handleSaveEdit}
       />
@@ -297,26 +328,23 @@ export function RecordList({ initialRecords }: RecordListProps) {
       {/* Delete confirmation */}
       <Dialog
         open={Boolean(deleteTarget)}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
-        }}
+        onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}
       >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete record</DialogTitle>
             <DialogDescription>
               Permanently remove{" "}
-              <span className="font-medium text-foreground">
-                {deleteTarget?.title}
-              </span>{" "}
-              from this client. This cannot be undone.
+              <span className="font-medium text-foreground">{deleteTarget?.title}</span> from this
+              client. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
+            <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
+              {isPending && <Loader2 className="size-4 animate-spin" />}
               Delete record
             </Button>
           </DialogFooter>

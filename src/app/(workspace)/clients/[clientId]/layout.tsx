@@ -1,5 +1,5 @@
 import { ClientTitleProvider } from "@/contexts/client-title";
-import { getClientById } from "@/lib/mock-data";
+import { getClientName } from "@/lib/actions/clients";
 
 type ClientLayoutProps = {
   children: React.ReactNode;
@@ -8,10 +8,10 @@ type ClientLayoutProps = {
 
 export default async function ClientLayout({ children, params }: ClientLayoutProps) {
   const { clientId } = await params;
-  const client = getClientById(clientId);
+  const name = await getClientName(clientId);
 
   return (
-    <ClientTitleProvider name={client?.name ?? "Client"}>
+    <ClientTitleProvider name={name ?? "Client"}>
       {children}
     </ClientTitleProvider>
   );

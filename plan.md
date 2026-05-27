@@ -106,14 +106,14 @@ Current state note:
   `User`, `UserRole`, `Client`, `Record`, `Tag`, `AuditEvent`
 - [x] Define v1 record fields:
   `title`, `service_name`, `url`, `username`, `secret_value`, `notes`, `tags`, timestamps, actor metadata
-- [ ] Add encryption helpers for secret-bearing fields
-- [ ] Separate standard record reads from reveal/copy actions
+- [x] Add encryption helpers for secret-bearing fields
+- [x] Separate standard record reads from reveal/copy actions
 - [x] Define audit event types for sensitive actions
 
 ### Deliverables
 
 - [x] Initial schema ready for persistence work
-- [ ] Encryption utilities in place
+- [x] Encryption utilities in place (AES-256-GCM, `src/lib/crypto.ts`)
 - [x] Audit model ready for feature integration
 
 ## Phase 5: Client Directory And Client Pages
@@ -145,7 +145,7 @@ Current state note:
 ### Tasks
 
 - [x] Build record listing inside each client
-- [ ] Support create, edit, and delete for `credential` and `secure_note`
+- [x] Support create, edit, and delete for `credential` and `secure_note` (local state — DB wiring next)
 - [x] Keep secret values hidden by default everywhere
 - [x] Add explicit `Reveal` action with visible security treatment
 - [x] Add explicit `Copy` action with visible feedback
@@ -154,7 +154,7 @@ Current state note:
 
 ### Deliverables
 
-- [ ] Full v1 record CRUD
+- [ ] Full v1 record CRUD (UI done; persistence wiring in progress)
 - [x] Secure reveal/copy workflow
 - [ ] Practical record organization and lookup
 
@@ -202,11 +202,11 @@ Current state note:
 
 - [x] Upload CSV file
 - [x] Parse headers and rows safely
-- [ ] Let the user map source columns to Vaultocrypt fields
+- [x] Let the user map source columns to Vaultocrypt fields
 - [ ] Let the user define how source rows become `Clients` vs `Internal`
 - [x] Provide a preview before import
 - [ ] Surface duplicate / conflict conditions before import
-- [ ] Persist imported data into the real database
+- [ ] Persist imported data into the real database (server action ready; UI not wired yet)
 - [ ] Store enough import provenance metadata to support validation and troubleshooting
 
 ### Required Export Capabilities
@@ -311,7 +311,7 @@ These actions must be treated as privileged and audited:
 2. [x] Scaffold the app foundation
 3. [x] Build the app shell
 4. [x] Integrate authentication
-5. [ ] Add data model and encryption core
+5. [x] Add data model and encryption core
 6. [x] Build client management
 7. [ ] Build record management
 8. [x] Build activity and settings surfaces
@@ -320,11 +320,11 @@ These actions must be treated as privileged and audited:
 
 ## Handoff Notes
 
-- Current client detail editing is handled by `src/components/app/client-details-card.tsx` and is local-only UI state.
-- Current client directory multi-select, CSV export, and delete are handled by `src/components/app/client-directory.tsx` and are local-only UI state.
-- Current import entry point is also in `src/components/app/client-directory.tsx` and supports upload + preview only.
-- Current mock client statuses are normalized to `Active` / `Inactive` in `src/lib/mock-data.ts`.
-- Prisma schema has now been aligned to `ACTIVE` / `INACTIVE` and includes `Client.category`.
+- Encryption: AES-256-GCM in `src/lib/crypto.ts`. Key from `VAULT_ENCRYPTION_KEY` env var (64-char hex).
+- Neon database is live. Schema pushed. Prisma client generated.
+- Server actions ready in `src/lib/actions/`: `clients.ts`, `records.ts`, `import.ts`.
+- `revealSecret` is the only place decryption happens — server-only, never exposed to the client bundle.
+- UI is still wired to mock data (`src/lib/mock-data.ts`) — **next step is swapping all local state to server action calls**.
+- Client directory, client detail editing, record CRUD, and import dialog all need to be re-wired.
 - CSV parsing helpers live in `src/lib/imports/csv.ts` and canonical import field types live in `src/lib/imports/types.ts`.
-- There is still no import/export server implementation yet.
 - Existing CSV export is only a small client-directory bulk export, not a record-level migration export.

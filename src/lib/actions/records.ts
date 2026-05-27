@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { RecordType } from "@prisma/client";
+import { RecordSensitivity, RecordType } from "@prisma/client";
 
 import { decrypt, encrypt } from "@/lib/crypto";
 import { prisma as db } from "@/lib/db";
@@ -17,6 +17,7 @@ export type RecordRow = {
   url: string | null;
   username: string | null;
   notes: string | null;
+  sensitivity: "STANDARD" | "SENSITIVE";
   isRestricted: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -38,6 +39,7 @@ export async function getRecords(clientId: string): Promise<RecordRow[]> {
       url: true,
       username: true,
       notes: true,
+      sensitivity: true,
       isRestricted: true,
       createdAt: true,
       updatedAt: true,
@@ -69,6 +71,7 @@ export type CreateRecordInput = {
   username?: string;
   secretValue?: string;
   notes?: string;
+  sensitivity?: "STANDARD" | "SENSITIVE";
 };
 
 export async function createRecord(input: CreateRecordInput) {
@@ -82,6 +85,7 @@ export async function createRecord(input: CreateRecordInput) {
       username: input.username?.trim() || null,
       secretCipher: input.secretValue ? encrypt(input.secretValue) : null,
       notes: input.notes?.trim() || null,
+      sensitivity: (input.sensitivity as RecordSensitivity) ?? RecordSensitivity.SENSITIVE,
     },
   });
   revalidatePath(`/clients/${input.clientId}`);
@@ -96,6 +100,7 @@ export type UpdateRecordInput = {
   username?: string;
   secretValue?: string;
   notes?: string;
+  sensitivity?: "STANDARD" | "SENSITIVE";
 };
 
 export async function updateRecord(recordId: string, clientId: string, input: UpdateRecordInput) {
@@ -111,6 +116,7 @@ export async function updateRecord(recordId: string, clientId: string, input: Up
         secretCipher: input.secretValue ? encrypt(input.secretValue) : null,
       }),
       ...(input.notes !== undefined && { notes: input.notes.trim() || null }),
+      ...(input.sensitivity !== undefined && { sensitivity: input.sensitivity as RecordSensitivity }),
     },
   });
   revalidatePath(`/clients/${clientId}`);

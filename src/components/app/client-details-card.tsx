@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { PencilLine } from "lucide-react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2, PencilLine } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,16 +19,24 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Client, ClientStatus } from "@/lib/mock-data";
+import { updateClient } from "@/lib/actions/clients";
+
+type ClientStatus = "Active" | "Inactive";
 
 type ClientDetailsCardProps = {
-  client: Client;
+  clientId: string;
+  initialName: string;
+  initialContact: string;
+  initialVertical: string;
+  initialStatus: ClientStatus;
 };
 
-type ClientDraft = Pick<
-  Client,
-  "name" | "contact" | "vertical" | "status"
->;
+type ClientDraft = {
+  name: string;
+  contact: string;
+  vertical: string;
+  status: ClientStatus;
+};
 
 const statuses: ClientStatus[] = ["Active", "Inactive"];
 
@@ -36,34 +45,46 @@ function statusBadgeVariant(status: ClientStatus) {
   return "outline";
 }
 
-export function ClientDetailsCard({ client }: ClientDetailsCardProps) {
+export function ClientDetailsCard({
+  clientId,
+  initialName,
+  initialContact,
+  initialVertical,
+  initialStatus,
+}: ClientDetailsCardProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
   const [open, setOpen] = useState(false);
   const [details, setDetails] = useState<ClientDraft>({
-    name: client.name,
-    contact: client.contact,
-    vertical: client.vertical,
-    status: client.status,
+    name: initialName,
+    contact: initialContact,
+    vertical: initialVertical,
+    status: initialStatus,
   });
   const [draft, setDraft] = useState<ClientDraft>(details);
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
-
-    if (nextOpen) {
-      setDraft(details);
-    }
+    if (nextOpen) setDraft(details);
   }
 
   function updateDraft<K extends keyof ClientDraft>(key: K, value: ClientDraft[K]) {
-    setDraft((current) => ({
-      ...current,
-      [key]: value,
-    }));
+    setDraft((current) => ({ ...current, [key]: value }));
   }
 
   function handleSave() {
-    setDetails(draft);
-    setOpen(false);
+    startTransition(async () => {
+      await updateClient(clientId, {
+        name: draft.name,
+        contact: draft.contact,
+        vertical: draft.vertical,
+        status: draft.status === "Active" ? "ACTIVE" : "INACTIVE",
+      });
+      setDetails(draft);
+      setOpen(false);
+      router.refresh();
+    });
   }
 
   return (
@@ -96,70 +117,59 @@ export function ClientDetailsCard({ client }: ClientDetailsCardProps) {
               </DialogHeader>
 
               <DialogBody>
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label>
-                    Client name
-                  </Label>
-                  <Input
-                    value={draft.name}
-                    onChange={(event) => updateDraft("name", event.target.value)}
-                  />
-                </div>
-
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="grid gap-4">
                   <div className="grid gap-2">
-                    <Label>
-                      Primary contact
-                    </Label>
+                    <Label>Client name</Label>
                     <Input
-                      value={draft.contact}
-                      onChange={(event) =>
-                        updateDraft("contact", event.target.value)
-                      }
+                      value={draft.name}
+                      onChange={(e) => updateDraft("name", e.target.value)}
                     />
                   </div>
 
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label>Primary contact</Label>
+                      <Input
+                        value={draft.contact}
+                        onChange={(e) => updateDraft("contact", e.target.value)}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Vertical</Label>
+                      <Input
+                        value={draft.vertical}
+                        onChange={(e) => updateDraft("vertical", e.target.value)}
+                      />
+                    </div>
+                  </div>
+
                   <div className="grid gap-2">
-                    <Label>
-                      Vertical
-                    </Label>
-                    <Input
-                      value={draft.vertical}
-                      onChange={(event) =>
-                        updateDraft("vertical", event.target.value)
-                      }
-                    />
+                    <Label>Status</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {statuses.map((status) => (
+                        <Button
+                          key={status}
+                          type="button"
+                          size="sm"
+                          variant={draft.status === status ? "default" : "outline"}
+                          onClick={() => updateDraft("status", status)}
+                        >
+                          {status}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-
-                <div className="grid gap-2">
-                  <Label>
-                    Status
-                  </Label>
-                  <div className="flex flex-wrap gap-2">
-                    {statuses.map((status) => (
-                      <Button
-                        key={status}
-                        type="button"
-                        size="sm"
-                        variant={draft.status === status ? "default" : "outline"}
-                        onClick={() => updateDraft("status", status)}
-                      >
-                        {status}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
               </DialogBody>
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleSave}>Save changes</Button>
+                <Button onClick={handleSave} disabled={isPending}>
+                  {isPending && <Loader2 className="size-4 animate-spin" />}
+                  Save changes
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

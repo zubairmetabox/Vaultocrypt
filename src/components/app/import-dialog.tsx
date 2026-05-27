@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/select";
 import { parseCsvText } from "@/lib/imports/csv";
 import { type ParsedCsvFile, type ParsedCsvRow } from "@/lib/imports/types";
-import type { Client, ClientStatus, VaultRecord } from "@/lib/mock-data";
+import type { ImportClientInput } from "@/lib/actions/import";
 
 // ─── Auto-detect field mapping from header names ──────────────────────────────
 
@@ -66,13 +66,10 @@ function hostnameFrom(url: string): string {
   }
 }
 
-let importSeq = 0;
-
 function csvToClients(
   rows: ParsedCsvRow[],
   columnMap: Record<string, string>,
-): Array<Omit<Client, "id" | "auditTrail">> {
-  // Reverse: targetField → sourceColumn
+): ImportClientInput[] {
   const fieldToCol: Partial<Record<string, string>> = {};
   for (const [col, field] of Object.entries(columnMap)) {
     if (field !== "skip") fieldToCol[field] = col;
@@ -81,52 +78,42 @@ function csvToClients(
   const pick = (row: ParsedCsvRow, field: string): string =>
     (fieldToCol[field] ? row[fieldToCol[field]!]?.trim() : "") ?? "";
 
-  // Strip folder-path prefix — e.g. "MBX Clients/Acme Corp" → "Acme Corp"
-  const stripPrefix = (raw: string) => raw.includes("/") ? raw.split("/").pop()!.trim() : raw.trim();
+  const stripPrefix = (raw: string) =>
+    raw.includes("/") ? raw.split("/").pop()!.trim() : raw.trim();
 
-  // Group rows by entry_name (client / folder name)
   const groups = new Map<string, ParsedCsvRow[]>();
   for (const row of rows) {
-    const raw = pick(row, "entry_name") || "Imported";
-    const name = stripPrefix(raw) || "Imported";
+    const name = stripPrefix(pick(row, "entry_name") || "Imported") || "Imported";
     if (!groups.has(name)) groups.set(name, []);
     groups.get(name)!.push(row);
   }
 
-  const result: Array<Omit<Client, "id" | "auditTrail">> = [];
+  const result: ImportClientInput[] = [];
 
   for (const [clientName, clientRows] of groups) {
-    const records: VaultRecord[] = clientRows.map((row) => {
+    const records = clientRows.map((row) => {
       const url = pick(row, "record_url");
       const secret = pick(row, "record_secret");
-      const notes = pick(row, "record_notes");
-      const type: VaultRecord["type"] = secret ? "credential" : "secure_note";
-      const service = hostnameFrom(url) || clientName;
+      const type = secret ? "CREDENTIAL" : "SECURE_NOTE";
 
       return {
-        id: `imp-${++importSeq}`,
         title: pick(row, "record_title") || "Untitled record",
-        type,
-        service,
-        url,
-        username: pick(row, "record_username"),
-        secretValue: secret,
-        notes,
-        lastUpdated: "Just imported",
-        sensitivity: "Sensitive",
+        type: type as "CREDENTIAL" | "SECURE_NOTE",
+        serviceName: hostnameFrom(url) || clientName,
+        url: url || undefined,
+        username: pick(row, "record_username") || undefined,
+        secretValue: secret || undefined,
+        notes: pick(row, "record_notes") || undefined,
       };
     });
 
     const rawStatus = pick(clientRows[0]!, "client_status").toLowerCase();
-    const status: ClientStatus = rawStatus === "inactive" ? "Inactive" : "Active";
-
     result.push({
       name: clientName,
-      category: pick(clientRows[0]!, "entry_category") === "Internal" ? "Internal" : "Clients",
-      contact: pick(clientRows[0]!, "client_contact"),
-      vertical: pick(clientRows[0]!, "client_vertical"),
-      status,
-      notes: "",
+      category: pick(clientRows[0]!, "entry_category") === "Internal" ? "INTERNAL" : "CLIENT",
+      contact: pick(clientRows[0]!, "client_contact") || undefined,
+      vertical: pick(clientRows[0]!, "client_vertical") || undefined,
+      status: rawStatus === "inactive" ? "INACTIVE" : "ACTIVE",
       records,
     });
   }
@@ -141,7 +128,7 @@ type Step = "upload" | "mapping" | "done";
 type ImportDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImport: (clients: Array<Omit<Client, "id" | "auditTrail">>) => void;
+  onImport: (clients: ImportClientInput[]) => Promise<void>;
 };
 
 export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
