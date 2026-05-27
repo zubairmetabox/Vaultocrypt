@@ -1,11 +1,17 @@
-export type ClientStatus = "Active" | "Restricted" | "Needs Review";
+export type ClientStatus = "Active" | "Inactive";
+export type ClientCategory = "Clients" | "Internal";
+
+type ClientSeedStatus = ClientStatus | "Restricted" | "Needs Review";
 
 export type VaultRecord = {
   id: string;
   title: string;
   type: "credential" | "secure_note";
   service: string;
+  url: string;
   username: string;
+  secretValue: string;
+  notes: string;
   lastUpdated: string;
   sensitivity: "Standard" | "Sensitive";
 };
@@ -23,6 +29,7 @@ export type AuditEvent = {
 export type Client = {
   id: string;
   name: string;
+  category: ClientCategory;
   contact: string;
   vertical: string;
   status: ClientStatus;
@@ -33,9 +40,10 @@ export type Client = {
 
 type ClientSeed = {
   name: string;
+  category?: ClientCategory;
   contact: string;
   vertical: string;
-  status: ClientStatus;
+  status: ClientSeedStatus;
   notes: string;
   auditTrail?: Array<{
     actor: string;
@@ -49,7 +57,10 @@ type ClientSeed = {
     title: string;
     type: "credential" | "secure_note";
     service: string;
+    url?: string;
     username: string;
+    secretValue?: string;
+    notes?: string;
     lastUpdated: string;
     sensitivity: "Standard" | "Sensitive";
   }>;
@@ -761,7 +772,7 @@ function buildDefaultAuditTrail(client: ClientSeed) {
   const primaryRecord = client.records[0];
   const secondaryRecord = client.records[1] ?? primaryRecord;
   const watchedRisk: AuditEvent["risk"] =
-    client.status === "Restricted" ? "Elevated" : "Watched";
+    client.status !== "Active" ? "Elevated" : "Watched";
 
   return [
     {
@@ -791,11 +802,33 @@ function buildDefaultAuditTrail(client: ClientSeed) {
   ];
 }
 
+function normalizeClientStatus(status: ClientSeedStatus): ClientStatus {
+  return status === "Active" ? "Active" : "Inactive";
+}
+
+/** Deterministic fake secret for demo/mock credentials — not real data. */
+function syntheticSecret(title: string, service: string): string {
+  const seed = (title + service)
+    .split("")
+    .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  const prefixes = ["Kj8#mP2v", "Aw$9rT6y", "Sh!2vR5p", "Li@6tM9w", "Ga#3mK7v"];
+  const suffix = String(seed % 9999).padStart(4, "0");
+  return prefixes[seed % prefixes.length] + suffix;
+}
+
 export const clients: Client[] = clientSeeds.map((client, clientIndex) => ({
   id: `cst-${String(clientIndex + 1).padStart(3, "0")}`,
   ...client,
+  category: client.category ?? "Clients",
+  status: normalizeClientStatus(client.status),
   records: client.records.map((record, recordIndex) => ({
     id: `rec-${String(clientIndex * 10 + recordIndex + 1).padStart(3, "0")}`,
+    url: "",
+    notes: "",
+    secretValue:
+      record.type === "credential"
+        ? (record.secretValue ?? syntheticSecret(record.title, record.service))
+        : "",
     ...record,
   })),
   auditTrail: (client.auditTrail ?? buildDefaultAuditTrail(client)).map(

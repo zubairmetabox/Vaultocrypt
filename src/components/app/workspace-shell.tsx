@@ -9,6 +9,7 @@ import { Sidebar } from "@/components/app/sidebar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogTitle,
@@ -51,8 +52,8 @@ export function WorkspaceShell({
           <Sidebar pathname={pathname} />
         </div>
 
-        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2rem] border border-border/80 bg-background/88 shadow-[0_30px_100px_-50px_rgba(15,23,42,0.45)] backdrop-blur">
-          <header className="sticky top-0 z-20 border-b border-border/70 bg-background/88 px-4 py-4 backdrop-blur sm:px-6">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2rem] border border-border/80 bg-background shadow-[0_30px_100px_-50px_rgba(15,23,42,0.45)]">
+          <header className="sticky top-0 z-20 border-b border-border/70 bg-background px-4 py-4 sm:px-6">
             <div className="flex flex-col gap-4">
               <div className="flex items-center gap-3">
                 <Dialog>
@@ -62,12 +63,14 @@ export function WorkspaceShell({
                       <span className="sr-only">Open navigation</span>
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-xs p-3">
+                  <DialogContent className="max-w-xs" showCloseButton={false}>
                     <DialogTitle className="sr-only">Navigation</DialogTitle>
                     <DialogDescription className="sr-only">
                       Workspace navigation
                     </DialogDescription>
-                    <Sidebar pathname={pathname} />
+                    <DialogBody className="p-3">
+                      <Sidebar pathname={pathname} />
+                    </DialogBody>
                   </DialogContent>
                 </Dialog>
 

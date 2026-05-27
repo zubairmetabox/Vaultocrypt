@@ -6,12 +6,19 @@ Vaultocrypt v1 is an internal-only web app for MetaBox Technology to manage clie
 
 The goal of v1 is not public SaaS readiness. The goal is real weekly internal usage by the MetaBox team with strong security defaults, clean UX, and a practical operational foundation.
 
+Current state note:
+- UI is still largely mock-data driven
+- Client editing, multi-select, delete, and CSV export currently work in local UI state only
+- Import now has a local upload + CSV preview UI, but no mapping or persistence yet
+- No migration-grade export exists yet
+
 ## Product Rules
 
 - [x] Internal MetaBox use only in v1
 - [x] No client login in v1
 - [x] No multi-tenant SaaS architecture in v1
 - [x] `Client` is the top-level business object
+- [x] Top-level entities will support two categories only: `Clients` and `Internal`
 - [x] Records belong directly to a client
 - [x] Supported record types in v1: `credential`, `secure_note`
 - [x] Default visibility is mostly shared internally, with restricted exceptions
@@ -31,6 +38,7 @@ The goal of v1 is not public SaaS readiness. The goal is real weekly internal us
 - [x] Main sections: `Clients`, `Activity`, `Settings`
 - [x] Main landing screen after login: client directory
 - [x] Client detail page: lean client header with basic details, then records immediately
+- [x] Client detail header fields currently shown: name, primary contact, vertical, status
 - [x] Record presentation: table/list hybrid
 - [x] Primary record actions: `Reveal`, `Copy`, `Edit`
 - [x] Create/edit flows: modal dialogs
@@ -114,17 +122,23 @@ The goal of v1 is not public SaaS readiness. The goal is real weekly internal us
 
 - [x] Build the client directory as the authenticated home screen
 - [x] Show client name and core details in each row/card
-- [x] Support create and edit client flows
+- [x] Support create and edit client flows in mock UI
 - [x] Build the lean client detail header
 - [x] Build the client records section as the main page body
 - [x] Support restricted-client markers for exceptional privacy cases
+- [x] Add bulk multi-select in the client directory
+- [x] Add local CSV export for selected clients
+- [x] Add local delete flow for selected clients
+- [x] Simplify client status UI to `Active` / `Inactive`
+- [x] Remove notes from the client detail header and edit flow
 
 ### Deliverables
 
 - [x] Usable client directory
 - [x] Client detail page structure
-- [x] Client creation and editing flows
+- [x] Client creation and editing flows in mock UI
 - [x] Client detail audit sidebar with aligned dashboard layout
+- [x] Selectable client directory with local bulk actions
 
 ## Phase 6: Record Management
 
@@ -163,7 +177,66 @@ The goal of v1 is not public SaaS readiness. The goal is real weekly internal us
 - [ ] Restriction support for exceptions
 - [x] Polished dashboard scrolling and balanced settings layout
 
-## Phase 8: Ops Readiness
+## Phase 8: Import / Export And Migration Readiness
+
+### Agreed Migration Direction
+
+- [x] Zoho Vault CSV has been reviewed manually
+- [x] Import should not hardcode field mapping
+- [x] User wants an import tool with a mapping step they control
+- [x] Final verification workflow will be:
+  export from Zoho -> import into Vaultocrypt -> export from Vaultocrypt -> compare both files
+- [x] Folder semantics should resolve into only two categories: `Clients` and `Internal`
+- [x] We do not need to preserve `Description`, `Tags`, `Classification`, `Favorite`, or raw `Folder Name` as first-class product fields
+
+### Current Reality
+
+- [x] There is a local import UI entry point in the client directory
+- [x] There is a local CSV parser foundation
+- [x] There is a local CSV preview dialog
+- [x] There is no saved mapping preset system yet
+- [x] Current export is only the local bulk client CSV from the client directory
+- [x] Current export is not sufficient for migration verification
+
+### Required Import Tool Capabilities
+
+- [x] Upload CSV file
+- [x] Parse headers and rows safely
+- [ ] Let the user map source columns to Vaultocrypt fields
+- [ ] Let the user define how source rows become `Clients` vs `Internal`
+- [x] Provide a preview before import
+- [ ] Surface duplicate / conflict conditions before import
+- [ ] Persist imported data into the real database
+- [ ] Store enough import provenance metadata to support validation and troubleshooting
+
+### Required Export Capabilities
+
+- [ ] Rework export around full record-level data, not only selected clients
+- [ ] Add a migration-verification export mode
+- [ ] Export deterministic row structure suitable for file-to-file comparison
+- [ ] Include enough fields to validate imported records correctly
+- [ ] Decide whether secret export should be allowed, masked, or optional
+
+### Proposed Verification Export Scope
+
+- [ ] Category (`Clients` / `Internal`)
+- [ ] Client or container name
+- [ ] Record title
+- [ ] URL
+- [ ] Username
+- [ ] Notes
+- [ ] Record type
+- [ ] Status
+- [ ] Optional source/import metadata for debugging
+
+### Deliverables
+
+- [ ] User-controlled import mapping tool
+- [ ] Preview-first import workflow with mapping and execution
+- [ ] Migration-grade export
+- [ ] Round-trip verification process against Zoho export
+
+## Phase 9: Ops Readiness
 
 ### Tasks
 
@@ -180,7 +253,7 @@ The goal of v1 is not public SaaS readiness. The goal is real weekly internal us
 - [ ] Production-readiness checklist
 - [ ] Safer deployment baseline
 
-## Phase 9: Manual Rollout
+## Phase 10: Manual Rollout
 
 ### Tasks
 
@@ -215,6 +288,7 @@ These actions must be treated as privileged and audited:
 - [x] Copy secret
 - [ ] Change role
 - [ ] Change restriction
+- [ ] Delete client
 - [ ] Delete record
 
 ## Manual Verification Focus
@@ -227,6 +301,9 @@ These actions must be treated as privileged and audited:
 - [ ] Role restrictions affect what actions are available
 - [ ] Audit activity is visible for sensitive events
 - [x] Dashboard shell uses internal scrolling without browser-page overflow
+- [ ] Import preview reflects user-defined mappings accurately
+- [x] CSV upload preview shows headers and sample rows safely, including multiline notes
+- [ ] Vaultocrypt export can be compared reliably against Zoho source export
 
 ## Current Build Order
 
@@ -238,4 +315,16 @@ These actions must be treated as privileged and audited:
 6. [x] Build client management
 7. [ ] Build record management
 8. [x] Build activity and settings surfaces
-9. [ ] Prepare deployment and internal rollout
+9. [ ] Build import / export and migration tooling
+10. [ ] Prepare deployment and internal rollout
+
+## Handoff Notes
+
+- Current client detail editing is handled by `src/components/app/client-details-card.tsx` and is local-only UI state.
+- Current client directory multi-select, CSV export, and delete are handled by `src/components/app/client-directory.tsx` and are local-only UI state.
+- Current import entry point is also in `src/components/app/client-directory.tsx` and supports upload + preview only.
+- Current mock client statuses are normalized to `Active` / `Inactive` in `src/lib/mock-data.ts`.
+- Prisma schema has now been aligned to `ACTIVE` / `INACTIVE` and includes `Client.category`.
+- CSV parsing helpers live in `src/lib/imports/csv.ts` and canonical import field types live in `src/lib/imports/types.ts`.
+- There is still no import/export server implementation yet.
+- Existing CSV export is only a small client-directory bulk export, not a record-level migration export.

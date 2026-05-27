@@ -14,8 +14,12 @@ enum AppRole {
 
 enum ClientStatus {
   ACTIVE
-  RESTRICTED
-  NEEDS_REVIEW
+  INACTIVE
+}
+
+enum ClientCategory {
+  CLIENT
+  INTERNAL
 }
 
 enum RecordType {
@@ -52,18 +56,19 @@ model User {
 }
 
 model Client {
-  id          String       @id @default(cuid())
-  name        String
-  contact     String?
-  vertical    String?
-  notes       String?
-  status      ClientStatus @default(ACTIVE)
-  isRestricted Boolean     @default(false)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  records     Record[]
-  tags        Tag[]        @relation("ClientTags")
-  auditEvents AuditEvent[]
+  id           String         @id @default(cuid())
+  name         String
+  contact      String?
+  vertical     String?
+  notes        String?
+  status       ClientStatus   @default(ACTIVE)
+  category     ClientCategory @default(CLIENT)
+  isRestricted Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  records      Record[]
+  tags         Tag[]          @relation("ClientTags")
+  auditEvents  AuditEvent[]
 }
 
 model Record {

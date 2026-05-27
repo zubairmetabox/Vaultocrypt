@@ -1,15 +1,10 @@
 import { notFound } from "next/navigation";
-import {
-  AlertTriangle,
-  Copy,
-  Eye,
-  PencilLine,
-  ShieldCheck,
-} from "lucide-react";
+import { AlertTriangle, ShieldCheck } from "lucide-react";
 
+import { ClientDetailsCard } from "@/components/app/client-details-card";
+import { RecordList } from "@/components/app/record-list";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { getClientById } from "@/lib/mock-data";
 
 type ClientPageProps = {
@@ -17,12 +12,6 @@ type ClientPageProps = {
     clientId: string;
   }>;
 };
-
-function statusBadgeVariant(status: string) {
-  if (status === "Restricted") return "destructive";
-  if (status === "Needs Review") return "secondary";
-  return "outline";
-}
 
 function auditRiskBadgeVariant(risk: string) {
   if (risk === "Elevated") return "destructive";
@@ -45,73 +34,8 @@ export default async function ClientPage({ params }: ClientPageProps) {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_400px]">
       <div className="space-y-6">
-        <Card className="border-border/70 bg-card/95">
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
-            <div className="space-y-2">
-              <CardTitle>{client.name}</CardTitle>
-              <div className="space-y-1 text-sm text-muted-foreground">
-                <p>{client.contact}</p>
-                <p>{client.vertical}</p>
-              </div>
-              <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-                {client.notes}
-              </p>
-            </div>
-
-            <Badge variant={statusBadgeVariant(client.status)}>{client.status}</Badge>
-          </CardHeader>
-        </Card>
-
-        <Card className="border-border/70 bg-card/95">
-          <CardHeader>
-            <CardTitle>Records</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {client.records.map((record) => (
-              <div
-                key={record.id}
-                className="rounded-[1.5rem] border border-border/70 bg-background/95 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-              >
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium text-foreground">{record.title}</p>
-                      <Badge variant="outline">{record.type}</Badge>
-                      <Badge
-                        variant={
-                          record.sensitivity === "Sensitive" ? "secondary" : "outline"
-                        }
-                      >
-                        {record.sensitivity}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {record.service} - {record.username}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Updated {record.lastUpdated}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button size="sm" variant="outline">
-                      <Eye className="size-4" />
-                      Reveal
-                    </Button>
-                    <Button size="sm" variant="outline">
-                      <Copy className="size-4" />
-                      Copy
-                    </Button>
-                    <Button size="sm">
-                      <PencilLine className="size-4" />
-                      Edit
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <ClientDetailsCard client={client} />
+        <RecordList initialRecords={client.records} />
       </div>
 
       <aside className="rounded-[1.75rem] border border-border/70 bg-background/85 p-4 shadow-sm xl:sticky xl:top-6 xl:self-start">
