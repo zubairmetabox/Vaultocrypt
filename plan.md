@@ -124,6 +124,7 @@ The goal of v1 is not public SaaS readiness. The goal is real weekly internal us
 - [x] Usable client directory
 - [x] Client detail page structure
 - [x] Client creation and editing flows
+- [x] Client detail audit sidebar with aligned dashboard layout
 
 ## Phase 6: Record Management
 
@@ -153,12 +154,14 @@ The goal of v1 is not public SaaS readiness. The goal is real weekly internal us
 - [x] Build settings surface for theme and future role controls
 - [ ] Add restriction management for sensitive clients or records
 - [x] Show record freshness details such as last updated by and when
+- [x] Refine dashboard shell height, scrolling, and balanced settings cards
 
 ### Deliverables
 
 - [x] Visible audit trail
 - [x] Basic settings controls
 - [ ] Restriction support for exceptions
+- [x] Polished dashboard scrolling and balanced settings layout
 
 ## Phase 8: Ops Readiness
 
@@ -223,6 +226,7 @@ These actions must be treated as privileged and audited:
 - [ ] Reveal and copy actions feel deliberate and safe
 - [ ] Role restrictions affect what actions are available
 - [ ] Audit activity is visible for sensitive events
+- [x] Dashboard shell uses internal scrolling without browser-page overflow
 
 ## Current Build Order
 

@@ -1,35 +1,12 @@
-import { LockKeyhole, Shield, SunMoon, Users } from "lucide-react";
+import { LockKeyhole, SunMoon, Users } from "lucide-react";
 
 import { ThemeToggle } from "@/components/app/theme-toggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { APP_ROLE_LABELS, APP_ROLES } from "@/lib/auth/roles";
 
-const settingsCards = [
-  {
-    title: "Theme",
-    copy: "Choose how Vaultocrypt should look for you: light, dark, or automatic system mode.",
-    icon: SunMoon,
-  },
-  {
-    title: "Roles",
-    copy: "Admin, Project Manager, and User controls will live here as the authorization layer is added.",
-    icon: Users,
-  },
-  {
-    title: "Restrictions",
-    copy: "Sensitive clients and records can be flagged as exceptions without changing the shared-first model.",
-    icon: LockKeyhole,
-  },
-  {
-    title: "Security posture",
-    copy: "Reveal and copy behavior will remain visible and auditable across the product.",
-    icon: Shield,
-  },
-];
-
 export default function SettingsPage() {
   return (
-    <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+    <div className="grid gap-4 lg:grid-cols-2">
       <Card className="border-border/70">
         <CardHeader>
           <div className="flex size-11 items-center justify-center rounded-[1.25rem] bg-muted">
@@ -39,43 +16,52 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-5">
           <p className="text-sm leading-6 text-muted-foreground">
-            Switch between light mode, dark mode, or automatic system-following behavior.
+            Switch between light mode, dark mode, or automatic system-following
+            behavior.
           </p>
           <ThemeToggle />
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
-        {settingsCards.slice(1).map((card) => {
-          const Icon = card.icon;
+      <Card className="border-border/70">
+        <CardHeader>
+          <div className="flex size-11 items-center justify-center rounded-[1.25rem] bg-muted">
+            <Users className="size-4" />
+          </div>
+          <CardTitle className="mt-3">Roles</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Admin, Project Manager, and User controls will live here as the
+            authorization layer is added.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {APP_ROLES.map((role) => (
+              <span
+                key={role}
+                className="rounded-full border border-border/70 bg-card px-3 py-1 text-xs text-muted-foreground"
+              >
+                {APP_ROLE_LABELS[role]}
+              </span>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
-          return (
-            <Card key={card.title} className="border-border/70">
-              <CardHeader>
-                <div className="flex size-11 items-center justify-center rounded-[1.25rem] bg-muted">
-                  <Icon className="size-4" />
-                </div>
-                <CardTitle className="mt-3">{card.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm leading-6 text-muted-foreground">{card.copy}</p>
-                {card.title === "Roles" ? (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {APP_ROLES.map((role) => (
-                      <span
-                        key={role}
-                        className="rounded-full border border-border/70 bg-card px-3 py-1 text-xs text-muted-foreground"
-                      >
-                        {APP_ROLE_LABELS[role]}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      <Card className="border-border/70 lg:col-span-2">
+        <CardHeader>
+          <div className="flex size-11 items-center justify-center rounded-[1.25rem] bg-muted">
+            <LockKeyhole className="size-4" />
+          </div>
+          <CardTitle className="mt-3">Restrictions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+            Sensitive clients and records can be flagged as exceptions without
+            changing the shared-first model.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

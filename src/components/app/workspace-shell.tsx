@@ -24,7 +24,7 @@ type WorkspaceShellProps = {
 
 const pageMeta: Record<string, { title: string; eyebrow?: string }> = {
   "/": { title: "Client Directory" },
-  "/activity": { title: "Activity", eyebrow: "Visible audit posture" },
+  "/activity": { title: "Activity" },
   "/settings": { title: "Settings", eyebrow: "Preferences and controls" },
 };
 
@@ -42,13 +42,16 @@ export function WorkspaceShell({
     : (pageMeta[pathname] ?? pageMeta["/"]);
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--app-shell-bg)" }}>
-      <div className="mx-auto grid min-h-screen max-w-[1600px] gap-4 p-3 sm:p-4 lg:grid-cols-[280px_1fr]">
-        <div className="hidden lg:block">
+    <div
+      className="h-screen overflow-hidden"
+      style={{ background: "var(--app-shell-bg)" }}
+    >
+      <div className="mx-auto grid h-full max-w-[1820px] gap-4 p-3 sm:p-4 lg:grid-cols-[280px_1fr]">
+        <div className="hidden h-full lg:block">
           <Sidebar pathname={pathname} />
         </div>
 
-        <div className="flex h-[calc(100vh-1.5rem)] min-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[2rem] border border-border/80 bg-background/88 shadow-[0_30px_100px_-50px_rgba(15,23,42,0.45)] backdrop-blur">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2rem] border border-border/80 bg-background/88 shadow-[0_30px_100px_-50px_rgba(15,23,42,0.45)] backdrop-blur">
           <header className="sticky top-0 z-20 border-b border-border/70 bg-background/88 px-4 py-4 backdrop-blur sm:px-6">
             <div className="flex flex-col gap-4">
               <div className="flex items-center gap-3">
@@ -107,7 +110,9 @@ export function WorkspaceShell({
             </div>
           </header>
 
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+          <main className="app-scrollbar flex-1 overflow-y-auto p-4 sm:p-6">
+            {children}
+          </main>
         </div>
       </div>
     </div>

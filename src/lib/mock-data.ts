@@ -10,6 +10,16 @@ export type VaultRecord = {
   sensitivity: "Standard" | "Sensitive";
 };
 
+export type AuditEvent = {
+  id: string;
+  actor: string;
+  action: "Revealed secret" | "Copied value" | "Viewed record" | "Edited record";
+  target: string;
+  occurredAt: string;
+  channel: string;
+  risk: "Normal" | "Watched" | "Elevated";
+};
+
 export type Client = {
   id: string;
   name: string;
@@ -18,6 +28,7 @@ export type Client = {
   status: ClientStatus;
   notes: string;
   records: VaultRecord[];
+  auditTrail: AuditEvent[];
 };
 
 type ClientSeed = {
@@ -26,6 +37,14 @@ type ClientSeed = {
   vertical: string;
   status: ClientStatus;
   notes: string;
+  auditTrail?: Array<{
+    actor: string;
+    action: "Revealed secret" | "Copied value" | "Viewed record" | "Edited record";
+    target: string;
+    occurredAt: string;
+    channel: string;
+    risk: "Normal" | "Watched" | "Elevated";
+  }>;
   records: Array<{
     title: string;
     type: "credential" | "secure_note";
@@ -43,6 +62,48 @@ const clientSeeds: ClientSeed[] = [
     vertical: "Hospitality",
     status: "Active",
     notes: "Shared internally across delivery and operations.",
+    auditTrail: [
+      {
+        actor: "Maya Chen",
+        action: "Revealed secret",
+        target: "Cloudflare Production",
+        occurredAt: "12 minutes ago",
+        channel: "Chrome on macOS",
+        risk: "Watched",
+      },
+      {
+        actor: "Jordan Patel",
+        action: "Copied value",
+        target: "Cloudflare Production",
+        occurredAt: "46 minutes ago",
+        channel: "Arc on macOS",
+        risk: "Elevated",
+      },
+      {
+        actor: "Noah Rivera",
+        action: "Viewed record",
+        target: "Meta Ads Access Notes",
+        occurredAt: "2 hours ago",
+        channel: "Safari on iPhone",
+        risk: "Normal",
+      },
+      {
+        actor: "Maya Chen",
+        action: "Edited record",
+        target: "Meta Ads Access Notes",
+        occurredAt: "Yesterday, 6:14 PM",
+        channel: "Chrome on macOS",
+        risk: "Normal",
+      },
+      {
+        actor: "System",
+        action: "Viewed record",
+        target: "Cloudflare Production",
+        occurredAt: "Yesterday, 9:03 AM",
+        channel: "SSO session verification",
+        risk: "Normal",
+      },
+    ],
     records: [
       {
         title: "Cloudflare Production",
@@ -696,6 +757,40 @@ const clientSeeds: ClientSeed[] = [
   },
 ];
 
+function buildDefaultAuditTrail(client: ClientSeed) {
+  const primaryRecord = client.records[0];
+  const secondaryRecord = client.records[1] ?? primaryRecord;
+  const watchedRisk: AuditEvent["risk"] =
+    client.status === "Restricted" ? "Elevated" : "Watched";
+
+  return [
+    {
+      actor: "Ops Team",
+      action: "Viewed record" as const,
+      target: primaryRecord.title,
+      occurredAt: "18 minutes ago",
+      channel: "Chrome on Windows",
+      risk: "Normal" as const,
+    },
+    {
+      actor: "Account Lead",
+      action: "Revealed secret" as const,
+      target: primaryRecord.title,
+      occurredAt: "3 hours ago",
+      channel: "Safari on macOS",
+      risk: watchedRisk,
+    },
+    {
+      actor: "Support",
+      action: "Edited record" as const,
+      target: secondaryRecord.title,
+      occurredAt: "Yesterday",
+      channel: "Workspace app",
+      risk: "Normal" as const,
+    },
+  ];
+}
+
 export const clients: Client[] = clientSeeds.map((client, clientIndex) => ({
   id: `cst-${String(clientIndex + 1).padStart(3, "0")}`,
   ...client,
@@ -703,6 +798,12 @@ export const clients: Client[] = clientSeeds.map((client, clientIndex) => ({
     id: `rec-${String(clientIndex * 10 + recordIndex + 1).padStart(3, "0")}`,
     ...record,
   })),
+  auditTrail: (client.auditTrail ?? buildDefaultAuditTrail(client)).map(
+    (event, eventIndex) => ({
+      id: `aud-${String(clientIndex * 10 + eventIndex + 1).padStart(3, "0")}`,
+      ...event,
+    }),
+  ),
 }));
 
 export function getClientById(clientId: string) {
