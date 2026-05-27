@@ -27,6 +27,7 @@ type WorkspaceShellProps = {
 
 const pageMeta: Record<string, { title: string; eyebrow?: string }> = {
   "/": { title: "Client Directory" },
+  "/internal": { title: "Internal", eyebrow: "Internal credentials & records" },
   "/activity": { title: "Activity" },
   "/settings": { title: "Settings", eyebrow: "Preferences and controls" },
 };

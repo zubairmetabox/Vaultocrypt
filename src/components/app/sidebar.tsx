@@ -37,23 +37,25 @@ export function Sidebar({ pathname, clients }: SidebarProps) {
   );
 
   const onClientPath = pathname === "/" || pathname.startsWith("/clients/");
+  const onInternalPath = pathname === "/internal" || pathname.startsWith("/internal/");
 
   const [clientsOpen, setClientsOpen] = useState(onClientPath);
-  const [internalOpen, setInternalOpen] = useState(onClientPath);
+  const [internalOpen, setInternalOpen] = useState(onInternalPath);
 
   useEffect(() => {
-    if (onClientPath) {
-      setClientsOpen(true);
-      setInternalOpen(true);
-    }
+    if (onClientPath) setClientsOpen(true);
   }, [onClientPath]);
+
+  useEffect(() => {
+    if (onInternalPath) setInternalOpen(true);
+  }, [onInternalPath]);
 
   return (
     <aside className="flex h-full min-h-0 w-full flex-col rounded-[2rem] border border-border/70 bg-sidebar p-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
       <BrandMark />
 
       <nav className="mt-6 flex flex-1 flex-col gap-2 overflow-hidden">
-        {/* ── Clients ─────────────────────────────────────────────────────── */}
+        {/* ── Clients ────────────────────────────────────────────────────── */}
         <SidebarSection
           label="Clients"
           icon={FolderKanban}
@@ -71,12 +73,12 @@ export function Sidebar({ pathname, clients }: SidebarProps) {
           )}
         </SidebarSection>
 
-        {/* ── Internal ─────────────────────────────────────────────────────── */}
+        {/* ── Internal ───────────────────────────────────────────────────── */}
         <SidebarSection
           label="Internal"
           icon={Building2}
-          href="/?category=internal"
-          active={false}
+          href="/internal"
+          active={onInternalPath}
           open={internalOpen}
           onToggle={() => setInternalOpen((o) => !o)}
         >
@@ -89,7 +91,7 @@ export function Sidebar({ pathname, clients }: SidebarProps) {
           )}
         </SidebarSection>
 
-        {/* ── Bottom nav ───────────────────────────────────────────────────── */}
+        {/* ── Bottom nav ─────────────────────────────────────────────────── */}
         <div className="mt-auto space-y-1 pt-2">
           {[
             { href: "/activity", label: "Activity", icon: Activity },
@@ -119,7 +121,8 @@ export function Sidebar({ pathname, clients }: SidebarProps) {
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── SidebarSection ───────────────────────────────────────────────────────────
+// Clicking the row navigates to href AND toggles the list open/closed.
 
 function SidebarSection({
   label,
@@ -140,35 +143,26 @@ function SidebarSection({
 }) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <Link
-          href={href}
+      {/* Single unified row: navigate + toggle */}
+      <Link
+        href={href}
+        onClick={onToggle}
+        className={cn(
+          "group flex w-full items-center gap-3 rounded-[1.25rem] px-3 py-3 text-sm font-medium transition-all duration-200",
+          active
+            ? "border border-border/80 bg-accent text-accent-foreground shadow-lg shadow-slate-950/10"
+            : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+        )}
+      >
+        <Icon className="size-4 shrink-0 transition-transform duration-200 group-hover:scale-105" />
+        <span className="flex-1">{label}</span>
+        <ChevronDown
           className={cn(
-            "group flex min-w-0 flex-1 items-center gap-3 rounded-[1.25rem] px-3 py-3 text-sm font-medium transition-all duration-200",
-            active
-              ? "border border-border/80 bg-accent text-accent-foreground shadow-lg shadow-slate-950/10"
-              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+            "size-4 shrink-0 transition-transform duration-200",
+            open && "rotate-180",
           )}
-        >
-          <Icon className="size-4 shrink-0 transition-transform duration-200 group-hover:scale-105" />
-          <span>{label}</span>
-        </Link>
-
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label={open ? `Collapse ${label}` : `Expand ${label}`}
-          aria-expanded={open}
-          className={cn(
-            "flex size-11 shrink-0 items-center justify-center rounded-[1.1rem] border border-transparent text-muted-foreground transition-all duration-200 hover:border-border/70 hover:bg-muted/70 hover:text-foreground",
-            open && "border-border/70 bg-muted/60 text-foreground",
-          )}
-        >
-          <ChevronDown
-            className={cn("size-4 transition-transform duration-200", open && "rotate-180")}
-          />
-        </button>
-      </div>
+        />
+      </Link>
 
       {open && (
         <div className="rounded-[1.4rem] border border-border/70 bg-card/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
@@ -180,6 +174,8 @@ function SidebarSection({
     </div>
   );
 }
+
+// ─── ClientLink ───────────────────────────────────────────────────────────────
 
 function ClientLink({ client, pathname }: { client: ClientRow; pathname: string }) {
   const active = pathname === `/clients/${client.id}`;

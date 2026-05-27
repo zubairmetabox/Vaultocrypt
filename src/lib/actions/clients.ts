@@ -45,6 +45,31 @@ export async function getClients(): Promise<ClientRow[]> {
   }));
 }
 
+export async function getInternalClients() {
+  return db.client.findMany({
+    where: { category: "INTERNAL" },
+    orderBy: { name: "asc" },
+    include: {
+      records: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          serviceName: true,
+          url: true,
+          username: true,
+          notes: true,
+          sensitivity: true,
+          isRestricted: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+    },
+  });
+}
+
 export async function getClientName(clientId: string): Promise<string | null> {
   const row = await db.client.findUnique({ where: { id: clientId }, select: { name: true } });
   return row?.name ?? null;
