@@ -16,6 +16,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useClientTitle } from "@/contexts/client-title";
 import { getClientById } from "@/lib/mock-data";
 
 type WorkspaceShellProps = {
@@ -34,12 +35,13 @@ export function WorkspaceShell({
   clerkEnabled,
 }: WorkspaceShellProps) {
   const pathname = usePathname();
+  const clientTitle = useClientTitle();
   const clientId = pathname.startsWith("/clients/")
     ? pathname.split("/")[2]
     : null;
   const currentClient = clientId ? getClientById(clientId) : null;
   const currentPage = pathname.startsWith("/clients/")
-    ? { title: currentClient?.name ?? "Client", eyebrow: undefined }
+    ? { title: clientTitle ?? currentClient?.name ?? "Client", eyebrow: undefined }
     : (pageMeta[pathname] ?? pageMeta["/"]);
 
   return (

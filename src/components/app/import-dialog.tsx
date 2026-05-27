@@ -24,29 +24,16 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { parseCsvText } from "@/lib/imports/csv";
-import { IMPORT_TARGET_FIELDS, type ParsedCsvFile, type ParsedCsvRow } from "@/lib/imports/types";
+import { type ParsedCsvFile, type ParsedCsvRow } from "@/lib/imports/types";
 import type { Client, ClientStatus, VaultRecord } from "@/lib/mock-data";
-
-// ─── Human-readable labels for target fields ─────────────────────────────────
-
-const TARGET_LABELS: Record<string, string> = {
-  entry_category: "Category (Clients / Internal)",
-  entry_name: "Client or folder name",
-  client_contact: "Client contact email",
-  client_vertical: "Industry / vertical",
-  client_status: "Client status",
-  record_title: "Record title",
-  record_type: "Record type (credential / note)",
-  record_url: "URL",
-  record_username: "Username / login",
-  record_secret: "Password / secret",
-  record_notes: "Notes",
-};
 
 // ─── Auto-detect field mapping from header names ──────────────────────────────
 
@@ -94,10 +81,14 @@ function csvToClients(
   const pick = (row: ParsedCsvRow, field: string): string =>
     (fieldToCol[field] ? row[fieldToCol[field]!]?.trim() : "") ?? "";
 
+  // Strip folder-path prefix — e.g. "MBX Clients/Acme Corp" → "Acme Corp"
+  const stripPrefix = (raw: string) => raw.includes("/") ? raw.split("/").pop()!.trim() : raw.trim();
+
   // Group rows by entry_name (client / folder name)
   const groups = new Map<string, ParsedCsvRow[]>();
   for (const row of rows) {
-    const name = pick(row, "entry_name") || "Imported";
+    const raw = pick(row, "entry_name") || "Imported";
+    const name = stripPrefix(raw) || "Imported";
     if (!groups.has(name)) groups.set(name, []);
     groups.get(name)!.push(row);
   }
@@ -414,11 +405,22 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="skip">— Skip —</SelectItem>
-                        {IMPORT_TARGET_FIELDS.map((field) => (
-                          <SelectItem key={field} value={field}>
-                            {TARGET_LABELS[field] ?? field}
-                          </SelectItem>
-                        ))}
+                        <SelectSeparator />
+                        <SelectGroup>
+                          <SelectLabel>Client Details</SelectLabel>
+                          <SelectItem value="entry_name">Client Name</SelectItem>
+                          <SelectItem value="client_contact">Client Contact Email</SelectItem>
+                          <SelectItem value="client_vertical">Client Industry</SelectItem>
+                        </SelectGroup>
+                        <SelectSeparator />
+                        <SelectGroup>
+                          <SelectLabel>Record Details</SelectLabel>
+                          <SelectItem value="record_title">Record Title</SelectItem>
+                          <SelectItem value="record_url">URL</SelectItem>
+                          <SelectItem value="record_username">Username / login</SelectItem>
+                          <SelectItem value="record_secret">Password / Secret</SelectItem>
+                          <SelectItem value="record_notes">Notes</SelectItem>
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </div>
