@@ -114,6 +114,14 @@ export function RecordList({ clientId, initialRecords }: RecordListProps) {
   // ── Create ────────────────────────────────────────────────────────────────
 
   function handleSaveNew(draft: Omit<VaultRecord, "id" | "lastUpdated">) {
+    // Optimistic — add to top of list immediately, close dialog
+    const tempId = `optimistic-${Date.now()}`;
+    setRecords((prev) => [
+      { ...draft, id: tempId, lastUpdated: "Just now" },
+      ...prev,
+    ]);
+    setCreateOpen(false);
+
     startCreate(async () => {
       await createRecord({
         clientId,
@@ -125,8 +133,7 @@ export function RecordList({ clientId, initialRecords }: RecordListProps) {
         secretValue: draft.secretValue,
         notes: draft.notes,
       });
-      setCreateOpen(false);
-      router.refresh();
+      router.refresh(); // swaps temp record with real one from DB
     });
   }
 
@@ -134,6 +141,14 @@ export function RecordList({ clientId, initialRecords }: RecordListProps) {
 
   function handleSaveEdit(draft: Omit<VaultRecord, "id" | "lastUpdated">) {
     if (!editRecord) return;
+    // Optimistic — reflect changes immediately, close dialog
+    setRecords((prev) =>
+      prev.map((r) =>
+        r.id === editRecord.id ? { ...r, ...draft, lastUpdated: "Just now" } : r,
+      ),
+    );
+    setEditRecord(null);
+
     startEdit(async () => {
       await updateRecord(editRecord.id, clientId, {
         title: draft.title,
@@ -144,7 +159,6 @@ export function RecordList({ clientId, initialRecords }: RecordListProps) {
         secretValue: draft.secretValue || undefined,
         notes: draft.notes,
       });
-      setEditRecord(null);
       router.refresh();
     });
   }
