@@ -190,40 +190,45 @@ function CategorySection({
   isOptimistic?: boolean;
 }) {
   const rowClass = cn(
-    "group flex w-full items-center gap-3 rounded-[1.25rem] px-3 py-3 text-sm font-medium transition-all duration-200",
+    "group flex w-full cursor-pointer items-center gap-3 rounded-[1.25rem] px-3 py-3 text-sm font-medium transition-all duration-200",
     isOptimistic
-      ? "text-muted-foreground opacity-60 cursor-default"
+      ? "cursor-default text-muted-foreground opacity-60"
       : active
         ? "border border-border/80 bg-accent text-accent-foreground shadow-lg shadow-slate-950/10"
         : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
   );
 
-  const rowInner = (
-    <>
-      <Icon className="size-4 shrink-0 transition-transform duration-200 group-hover:scale-105" />
-      <span className="flex-1 truncate">{cat.name}</span>
-      {isOptimistic ? (
-        <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
-      ) : (
-        <ChevronDown
-          className={cn(
-            "size-4 shrink-0 transition-transform duration-200",
-            open && "rotate-180",
-          )}
-        />
-      )}
-    </>
-  );
-
   return (
     <div className="space-y-1.5">
-      {isOptimistic ? (
-        <div className={rowClass}>{rowInner}</div>
-      ) : (
-        <Link href={`/categories/${cat.id}`} onClick={onToggle} className={rowClass}>
-          {rowInner}
-        </Link>
-      )}
+      {/* Entire row toggles the section; icon+text also navigates */}
+      <div className={rowClass} onClick={isOptimistic ? undefined : onToggle}>
+        {isOptimistic ? (
+          <>
+            <Icon className="size-4 shrink-0" />
+            <span className="flex-1 truncate">{cat.name}</span>
+            <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+          </>
+        ) : (
+          <>
+            {/* Icon + text: navigate to category page (stops propagation so toggle fires once) */}
+            <Link
+              href={`/categories/${cat.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex min-w-0 flex-1 items-center gap-3"
+            >
+              <Icon className="size-4 shrink-0 transition-transform duration-200 group-hover:scale-105" />
+              <span className="truncate">{cat.name}</span>
+            </Link>
+            {/* Chevron: click bubbles up to outer div → toggle only */}
+            <ChevronDown
+              className={cn(
+                "size-4 shrink-0 transition-transform duration-200",
+                open && "rotate-180",
+              )}
+            />
+          </>
+        )}
+      </div>
 
       {!isOptimistic && open && (
         <div className="rounded-[1.4rem] border border-border/70 bg-card/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
