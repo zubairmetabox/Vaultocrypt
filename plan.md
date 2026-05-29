@@ -236,6 +236,69 @@ Current state note:
 - [ ] Migration-grade export
 - [ ] Round-trip verification process against Zoho export
 
+## UX Standards
+
+These are non-negotiable rules applied to every interactive surface in the app.
+Any new feature must satisfy all of them before it is considered done.
+
+### Loading States
+
+- [x] **Page navigation** — top loader bar (`nextjs-toploader`) fires on every route change. No spinner, 2px height, brand cyan.
+- [x] **Record create** — optimistic: record appears at top of list immediately, dialog closes, server action runs in background.
+- [x] **Record edit** — optimistic: record reflects new values immediately, dialog closes, server action runs in background.
+- [x] **Record delete** — optimistic: record removed from list immediately, dialog closes, server action runs in background.
+- [x] **Client details save** — `useTransition` spinner on the Save button, form disabled while pending.
+- [x] **Client create** — `useTransition` spinner on Create button.
+- [x] **Client delete (bulk)** — `useTransition` spinner on Confirm button, Cancel disabled.
+- [ ] **Import** — progress indicator during CSV parse and DB write.
+- [ ] **Export** — loading state while building the download blob.
+- [ ] **Reveal secret** — per-record spinner already present; audit event write should not add visible delay.
+
+### Dialog Behaviour
+
+- [x] **Form resets on every open** — dialogs never carry values from a previous session. Reset is driven by `useEffect` on `open` prop, not `onOpenChange`, because Radix only calls `onOpenChange` for internal close triggers.
+- [x] **Dialog blocked during save** — `isPending` prevents close (Escape, overlay click) and disables all inputs and action buttons while a save is in flight.
+- [x] **Cancel disabled during save** — prevents partial close and data loss.
+- [ ] **Error feedback inside dialog** — if a server action throws, show an inline error message rather than silently failing or leaving the dialog in a broken state.
+
+### Optimistic Updates
+
+- **Rule**: any mutation that only affects local data (the current client's records) must update the UI before awaiting the server response, then let `router.refresh()` sync the authoritative state silently.
+- **Do not** wait for the server before closing a dialog or removing a list item.
+- **Temporary IDs** — use `crypto.randomUUID()` or `optimistic-${Date.now()}` for items created before the DB responds. `router.refresh()` will replace them with real IDs.
+- **Edit patch** — spread the draft onto the existing record in local state; the server response via `router.refresh()` is the source of truth for any server-computed fields (timestamps, etc.).
+
+### Empty States
+
+- [x] Client directory — empty state with CTA to add first client.
+- [x] Record list — empty state with CTA to add first record.
+- [x] Internal page — empty state explaining how to add internal entries.
+- [ ] Activity page — empty state when no audit events exist yet.
+- [ ] Search results — empty state when no matches found.
+
+### Feedback Patterns
+
+- [x] **Copy confirmation** — "Copied" label + icon swap for 2 seconds after clipboard write.
+- [x] **Reveal toggle** — button switches between Reveal / Hide with matching icon.
+- [ ] **Toast notifications** — success/error toasts for operations where optimistic UI is not enough (e.g. import completion, export download, bulk delete of clients).
+- [ ] **Destructive confirmation** — all delete operations require an explicit confirmation dialog. Never delete on first click.
+- [x] **Delete requires confirmation** — both record delete and client bulk-delete use confirmation dialogs.
+
+### Accessibility
+
+- [ ] All dialogs have `DialogTitle` and `DialogDescription` (or `sr-only` equivalents).
+- [ ] All icon-only buttons have `aria-label`.
+- [ ] Focus is trapped inside open dialogs.
+- [ ] Keyboard navigation works for all primary actions.
+
+### Performance
+
+- [ ] Sidebar client list is server-fetched at layout level — no client-side data fetch for navigation.
+- [x] Secrets are never included in page renders — only fetched on explicit Reveal/Copy action via server action RPC.
+- [ ] Large record lists should paginate or virtualise beyond 100 items.
+
+---
+
 ## Phase 9: Ops Readiness
 
 ### Tasks
