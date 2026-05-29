@@ -114,6 +114,7 @@ export function ClientDetailsCard({
   // ── Move handlers ──────────────────────────────────────────────────────────
 
   function handleMoveOpenChange(nextOpen: boolean) {
+    if (isMovePending) return; // block Escape/overlay close while in flight
     setMoveOpen(nextOpen);
     if (nextOpen) setSelectedCategoryId(null);
   }
@@ -121,12 +122,10 @@ export function ClientDetailsCard({
   function handleMove() {
     if (!selectedCategoryId || isMovePending) return;
     const newCatId = selectedCategoryId;
-    // Optimistic: update card label + close dialog immediately
-    setActiveCategoryId(newCatId);
-    setMoveOpen(false);
-    // Fire server action + refresh in background
     startMoveTransition(async () => {
       await updateClient(clientId, { categoryId: newCatId });
+      setActiveCategoryId(newCatId);
+      setMoveOpen(false);
       router.refresh();
     });
   }
@@ -148,12 +147,9 @@ export function ClientDetailsCard({
             {details.vertical && <p>{details.vertical}</p>}
           </div>
           {activeCategory && (
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Category:{" "}
               <span className="font-medium text-foreground">{activeCategory.name}</span>
-              {isMovePending && (
-                <Loader2 className="size-3 animate-spin text-muted-foreground" />
-              )}
             </p>
           )}
         </div>
@@ -192,7 +188,7 @@ export function ClientDetailsCard({
                         <button
                           key={cat.id}
                           type="button"
-                          onClick={() => !isMovePending && setSelectedCategoryId(cat.id)}
+                          onClick={() => setSelectedCategoryId(cat.id)}
                           disabled={isMovePending}
                           className={cn(
                             "flex w-full items-center gap-3 rounded-[1.25rem] border px-4 py-3 text-left text-sm transition-all duration-150",
@@ -200,7 +196,7 @@ export function ClientDetailsCard({
                               ? "border-primary/50 bg-primary/8 text-foreground"
                               : "border-border/70 bg-card/60 text-muted-foreground",
                             !isMovePending && !isSelected && "hover:border-border hover:bg-muted/60 hover:text-foreground",
-                            isMovePending && "cursor-not-allowed opacity-60",
+                            isMovePending && "cursor-not-allowed opacity-50",
                           )}
                         >
                           <div
@@ -221,10 +217,11 @@ export function ClientDetailsCard({
               </DialogBody>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setMoveOpen(false)}>
+                <Button variant="outline" onClick={() => setMoveOpen(false)} disabled={isMovePending}>
                   Cancel
                 </Button>
-                <Button onClick={handleMove} disabled={!selectedCategoryId}>
+                <Button onClick={handleMove} disabled={!selectedCategoryId || isMovePending}>
+                  {isMovePending && <Loader2 className="size-4 animate-spin" />}
                   Move client
                 </Button>
               </DialogFooter>
