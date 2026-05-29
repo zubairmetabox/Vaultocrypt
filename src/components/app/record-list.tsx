@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowRightLeft,
   Check,
   ClipboardCheck,
   Copy,
@@ -16,6 +17,7 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { MoveRecordDialog } from "@/components/app/move-record-dialog";
 import { RecordFormDialog } from "@/components/app/record-form-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,16 +36,18 @@ import {
   revealSecret,
   updateRecord,
 } from "@/lib/actions/records";
+import type { CategoryWithClients } from "@/lib/actions/categories";
 import type { VaultRecord } from "@/lib/mock-data";
 
 type RecordListProps = {
   clientId: string;
   initialRecords: VaultRecord[];
+  categories?: CategoryWithClients[];
 };
 
 type DeleteTarget = { id: string; title: string } | null;
 
-export function RecordList({ clientId, initialRecords }: RecordListProps) {
+export function RecordList({ clientId, initialRecords, categories }: RecordListProps) {
   const router = useRouter();
   const [isCreating, startCreate] = useTransition();
   const [isEditing, startEdit] = useTransition();
@@ -61,6 +65,7 @@ export function RecordList({ clientId, initialRecords }: RecordListProps) {
   const [editRecord, setEditRecord] = useState<VaultRecord | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
+  const [moveTarget, setMoveTarget] = useState<{ id: string; title: string } | null>(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Reveal ────────────────────────────────────────────────────────────────
@@ -306,6 +311,17 @@ export function RecordList({ clientId, initialRecords }: RecordListProps) {
                         Edit
                       </Button>
 
+                      {categories && categories.length > 0 && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setMoveTarget({ id: record.id, title: record.title })}
+                        >
+                          <ArrowRightLeft className="size-4" />
+                          Move
+                        </Button>
+                      )}
+
                       <Button
                         size="sm"
                         variant="ghost"
@@ -365,6 +381,18 @@ export function RecordList({ clientId, initialRecords }: RecordListProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Move record */}
+      {categories && moveTarget && (
+        <MoveRecordDialog
+          open={Boolean(moveTarget)}
+          onOpenChange={(o) => { if (!o) setMoveTarget(null); }}
+          recordId={moveTarget.id}
+          recordTitle={moveTarget.title}
+          currentClientId={clientId}
+          categories={categories}
+        />
+      )}
     </>
   );
 }

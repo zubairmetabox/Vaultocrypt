@@ -127,3 +127,9 @@ export async function deleteRecord(recordId: string, clientId: string) {
   await db.record.delete({ where: { id: recordId } });
   revalidatePath(`/clients/${clientId}`);
 }
+
+export async function moveRecord(recordId: string, fromClientId: string, toClientId: string) {
+  await db.record.update({ where: { id: recordId }, data: { clientId: toClientId } });
+  revalidatePath(`/clients/${fromClientId}`);
+  revalidatePath(`/clients/${toClientId}`);
+}

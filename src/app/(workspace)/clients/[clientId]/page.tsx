@@ -70,7 +70,7 @@ export default async function ClientPage({ params }: ClientPageProps) {
           currentCategoryId={client.categoryId}
           categories={categories}
         />
-        <RecordList clientId={client.id} initialRecords={records} />
+        <RecordList clientId={client.id} initialRecords={records} categories={categories} />
       </div>
 
       <aside className="rounded-[1.75rem] border border-border/70 bg-background/85 p-4 shadow-sm xl:sticky xl:top-6 xl:self-start">
