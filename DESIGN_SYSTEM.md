@@ -359,6 +359,158 @@ NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
 
 ---
 
+## 13. UX Standards
+
+These rules apply to every interactive surface. A feature is not done until all relevant rules are satisfied.
+
+### Loading states
+
+Every operation that touches the network must have a visible in-progress state. There are two patterns — pick based on whether the result is predictable.
+
+**Optimistic (preferred for local mutations)**
+Update the UI immediately, fire the server action in the background, then let `router.refresh()` sync the authoritative state silently. The user never waits.
+
+```tsx
+function handleDelete() {
+  const targetId = deleteTarget.id;
+  // 1. Update local state immediately
+  setItems((prev) => prev.filter((i) => i.id !== targetId));
+  setDeleteTarget(null);
+  // 2. Persist in background
+  startTransition(async () => {
+    await deleteItem(targetId);
+    router.refresh();
+  });
+}
+
+function handleCreate(draft) {
+  // 1. Prepend optimistic record with a temp ID
+  const tempId = `optimistic-${Date.now()}`;
+  setItems((prev) => [{ ...draft, id: tempId, createdAt: new Date() }, ...prev]);
+  setCreateOpen(false);
+  // 2. Persist in background
+  startTransition(async () => {
+    await createItem(draft);
+    router.refresh(); // replaces temp ID with real one
+  });
+}
+```
+
+Use optimistic updates for: create, edit, delete on list items.
+
+**Pending spinner (for operations with unknown outcomes)**
+Use `useTransition` + a `Loader2` spinner on the action button when the result cannot be predicted client-side (e.g. a save that may fail validation server-side, a bulk import, an export).
+
+```tsx
+const [isPending, startTransition] = useTransition();
+
+<Button onClick={handleSave} disabled={isPending}>
+  {isPending && <Loader2 className="size-4 animate-spin" />}
+  Save changes
+</Button>
+```
+
+Use separate `useTransition` instances for independent operations (create / edit / delete) so their loading states don't bleed into each other.
+
+**Page navigation**
+Always mount `<NextTopLoader color="#9edcff" height={2} showSpinner={false} shadow={false} />` at the root layout. It fires automatically on every `<Link>` click and `router.push` — no per-page wiring needed.
+
+---
+
+### Dialog behaviour
+
+**Always reset the form on open.**
+Radix `onOpenChange` only fires for internally-triggered closes (Escape, overlay click). When a parent sets `open={true}` via prop, `onOpenChange` is not called. Use `useEffect` to reset:
+
+```tsx
+useEffect(() => {
+  if (open) {
+    setDraft(record ? toDraft(record) : EMPTY_DRAFT);
+  }
+}, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+```
+
+**Block close during save.**
+While `isPending`, prevent the dialog from closing and disable all inputs:
+
+```tsx
+function handleOpenChange(nextOpen: boolean) {
+  if (isPending) return;
+  onOpenChange(nextOpen);
+}
+```
+
+**Disable Cancel during save.**
+Both the primary and cancel buttons should be `disabled={isPending}`. Never let the user close a dialog mid-flight.
+
+**Error feedback.**
+If a server action throws, show an inline error message inside the dialog. Never silently fail or leave the dialog in a broken state.
+
+---
+
+### Destructive actions
+
+- Never delete on first click. Always require a confirmation dialog.
+- The confirmation dialog must name the item being deleted.
+- Both Cancel and Confirm must be disabled while the delete is in flight.
+- Use optimistic removal: remove the item from local state before awaiting the server, so the list updates instantly when the user confirms.
+
+```tsx
+// ✅ correct
+setItems((prev) => prev.filter((i) => i.id !== targetId));
+setDeleteTarget(null);
+startTransition(async () => { await deleteItem(targetId); router.refresh(); });
+
+// ❌ wrong — user sees the item for 2+ seconds after confirming
+startTransition(async () => { await deleteItem(targetId); router.refresh(); });
+```
+
+---
+
+### Empty states
+
+Every list or collection must have a designed empty state — not a blank area. Include:
+- A muted icon representing the content type
+- A short headline ("No records yet")
+- A one-line description explaining what will appear here
+- A CTA button to create the first item (when creation is available on this screen)
+
+---
+
+### Feedback patterns
+
+| Action | Feedback |
+|---|---|
+| Copy to clipboard | Button label + icon swap to "Copied" for 2 seconds |
+| Reveal secret | Button toggles between Reveal / Hide with matching icon |
+| Bulk select | Inline chip showing "N selected" appears in the toolbar |
+| Successful import | Toast: "Imported X clients and Y records" |
+| Failed save | Inline error message inside the dialog, not a page-level error |
+| Destructive confirm | Confirmation dialog naming the item, with a red Confirm button |
+
+Toast notifications should be used for outcomes that happen outside the current focused dialog — import completion, export download, background sync errors. Use `sonner` or the shadcn `toast` component.
+
+---
+
+### Accessibility
+
+- All dialogs must have a visible or `sr-only` `<DialogTitle>` and `<DialogDescription>`.
+- Icon-only buttons must have `aria-label`.
+- Focus must be trapped inside open dialogs (Radix handles this automatically).
+- Keyboard navigation must work for all primary actions (Tab, Enter, Escape).
+- Colour alone must never be the only signal — pair colour with an icon or label.
+
+---
+
+### Performance rules
+
+- Secrets are never included in page renders. Fetch them only via an explicit Reveal or Copy server action.
+- Sidebar data is fetched server-side at layout level — the client component receives it as a prop. Never fire a client-side fetch just to populate navigation.
+- `router.refresh()` is the reconciliation mechanism after mutations. It re-runs server components and syncs props — use it consistently instead of managing server state locally.
+- Lists beyond ~100 items should paginate or virtualise.
+
+---
+
 ## Reference: complete root layout
 
 ```tsx
