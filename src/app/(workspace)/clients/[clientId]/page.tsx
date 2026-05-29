@@ -5,6 +5,7 @@ import { ClientDetailsCard } from "@/components/app/client-details-card";
 import { RecordList } from "@/components/app/record-list";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { getCategories } from "@/lib/actions/categories";
 import { getClientWithRecords } from "@/lib/actions/clients";
 import type { VaultRecord } from "@/lib/mock-data";
 
@@ -33,7 +34,10 @@ function formatUpdated(date: Date): string {
 
 export default async function ClientPage({ params }: ClientPageProps) {
   const { clientId } = await params;
-  const client = await getClientWithRecords(clientId);
+  const [client, categories] = await Promise.all([
+    getClientWithRecords(clientId),
+    getCategories(),
+  ]);
 
   if (!client) notFound();
 
@@ -63,6 +67,8 @@ export default async function ClientPage({ params }: ClientPageProps) {
           initialContact={client.contact ?? ""}
           initialVertical={client.vertical ?? ""}
           initialStatus={client.status === "ACTIVE" ? "Active" : "Inactive"}
+          currentCategoryId={client.categoryId}
+          categories={categories}
         />
         <RecordList clientId={client.id} initialRecords={records} />
       </div>
