@@ -55,7 +55,6 @@ export default async function InternalPage() {
           secretValue: "",
           notes: r.notes ?? "",
           lastUpdated: formatUpdated(r.updatedAt),
-          sensitivity: r.sensitivity === "SENSITIVE" ? "Sensitive" : "Standard",
         }));
 
         return (

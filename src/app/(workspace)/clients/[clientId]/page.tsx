@@ -48,7 +48,6 @@ export default async function ClientPage({ params }: ClientPageProps) {
     secretValue: "", // never sent in listing — revealed via server action on demand
     notes: r.notes ?? "",
     lastUpdated: formatUpdated(r.updatedAt),
-    sensitivity: r.sensitivity === "SENSITIVE" ? "Sensitive" : "Standard",
   }));
 
   const elevatedEvents = client.auditEvents.filter(

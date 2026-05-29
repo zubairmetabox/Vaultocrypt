@@ -27,7 +27,6 @@ type RecordDraft = {
   username: string;
   secretValue: string;
   notes: string;
-  sensitivity: "Standard" | "Sensitive";
 };
 
 type RecordFormDialogProps = {
@@ -48,7 +47,6 @@ const EMPTY_DRAFT: RecordDraft = {
   username: "",
   secretValue: "",
   notes: "",
-  sensitivity: "Sensitive",
 };
 
 function toDraft(record: VaultRecord): RecordDraft {
@@ -60,7 +58,6 @@ function toDraft(record: VaultRecord): RecordDraft {
     username: record.username,
     secretValue: record.secretValue,
     notes: record.notes,
-    sensitivity: record.sensitivity,
   };
 }
 
@@ -210,22 +207,6 @@ export function RecordFormDialog({
               />
             </div>
 
-            {/* Sensitivity */}
-            <div className="grid gap-2">
-              <Label>Sensitivity</Label>
-              <ToggleGroup
-                type="single"
-                variant="outline"
-                spacing={0}
-                className="w-full"
-                value={draft.sensitivity}
-                onValueChange={(v) => v && set("sensitivity", v as RecordDraft["sensitivity"])}
-                disabled={isPending}
-              >
-                <ToggleGroupItem value="Sensitive" className="flex-1">Sensitive</ToggleGroupItem>
-                <ToggleGroupItem value="Standard" className="flex-1">Standard</ToggleGroupItem>
-              </ToggleGroup>
-            </div>
           </div>
         </DialogBody>
 

@@ -13,7 +13,6 @@ export type VaultRecord = {
   secretValue: string;
   notes: string;
   lastUpdated: string;
-  sensitivity: "Standard" | "Sensitive";
 };
 
 export type AuditEvent = {

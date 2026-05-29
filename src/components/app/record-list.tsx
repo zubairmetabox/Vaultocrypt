@@ -124,7 +124,6 @@ export function RecordList({ clientId, initialRecords }: RecordListProps) {
         username: draft.username,
         secretValue: draft.secretValue,
         notes: draft.notes,
-        sensitivity: draft.sensitivity === "Sensitive" ? "SENSITIVE" : "STANDARD",
       });
       setCreateOpen(false);
       router.refresh();
@@ -144,7 +143,6 @@ export function RecordList({ clientId, initialRecords }: RecordListProps) {
         username: draft.username,
         secretValue: draft.secretValue || undefined,
         notes: draft.notes,
-        sensitivity: draft.sensitivity === "Sensitive" ? "SENSITIVE" : "STANDARD",
       });
       setEditRecord(null);
       router.refresh();
@@ -155,14 +153,19 @@ export function RecordList({ clientId, initialRecords }: RecordListProps) {
 
   function handleDelete() {
     if (!deleteTarget) return;
+    const targetId = deleteTarget.id;
+
+    // Optimistic — remove from UI immediately
+    setRecords((prev) => prev.filter((r) => r.id !== targetId));
+    setRevealedSecrets((prev) => {
+      const next = new Map(prev);
+      next.delete(targetId);
+      return next;
+    });
+    setDeleteTarget(null);
+
     startDelete(async () => {
-      await deleteRecord(deleteTarget.id, clientId);
-      setRevealedSecrets((prev) => {
-        const next = new Map(prev);
-        next.delete(deleteTarget.id);
-        return next;
-      });
-      setDeleteTarget(null);
+      await deleteRecord(targetId, clientId);
       router.refresh();
     });
   }
@@ -224,12 +227,6 @@ export function RecordList({ clientId, initialRecords }: RecordListProps) {
                         <p className="font-medium text-foreground">{record.title}</p>
                         <Badge variant="outline" className="text-xs">
                           {isNote ? "secure note" : "credential"}
-                        </Badge>
-                        <Badge
-                          variant={record.sensitivity === "Sensitive" ? "secondary" : "outline"}
-                          className="text-xs"
-                        >
-                          {record.sensitivity}
                         </Badge>
                       </div>
 
