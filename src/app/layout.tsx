@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import NextTopLoader from "nextjs-toploader";
 import { AuthProvider } from "@/components/auth-provider";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -52,9 +51,8 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <Script id="theme-init" strategy="beforeInteractive">
-          {themeInitScript}
-        </Script>
+        {/* Inline sync script — runs before first paint, prevents dark-mode FOUC */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="min-h-full font-sans text-foreground">
         <NextTopLoader color="#9edcff" height={2} showSpinner={false} shadow={false} />
