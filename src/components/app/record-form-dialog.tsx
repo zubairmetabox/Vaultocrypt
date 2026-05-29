@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { KeyRound, Loader2, StickyNote } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -73,12 +73,16 @@ export function RecordFormDialog({
     record ? toDraft(record) : EMPTY_DRAFT,
   );
 
+  // Reset form every time the dialog opens (covers both create and edit)
+  useEffect(() => {
+    if (open) {
+      setDraft(record ? toDraft(record) : EMPTY_DRAFT);
+    }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleOpenChange(nextOpen: boolean) {
     if (isPending) return; // block close while saving
     onOpenChange(nextOpen);
-    if (nextOpen) {
-      setDraft(record ? toDraft(record) : EMPTY_DRAFT);
-    }
   }
 
   function set<K extends keyof RecordDraft>(key: K, value: RecordDraft[K]) {
