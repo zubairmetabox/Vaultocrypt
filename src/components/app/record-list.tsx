@@ -45,7 +45,9 @@ type DeleteTarget = { id: string; title: string } | null;
 
 export function RecordList({ clientId, initialRecords }: RecordListProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [isCreating, startCreate] = useTransition();
+  const [isEditing, startEdit] = useTransition();
+  const [isDeleting, startDelete] = useTransition();
 
   // Keep local copy in sync when server refreshes props
   const [records, setRecords] = useState<VaultRecord[]>(initialRecords);
@@ -112,7 +114,7 @@ export function RecordList({ clientId, initialRecords }: RecordListProps) {
   // ── Create ────────────────────────────────────────────────────────────────
 
   function handleSaveNew(draft: Omit<VaultRecord, "id" | "lastUpdated">) {
-    startTransition(async () => {
+    startCreate(async () => {
       await createRecord({
         clientId,
         title: draft.title,
@@ -133,7 +135,7 @@ export function RecordList({ clientId, initialRecords }: RecordListProps) {
 
   function handleSaveEdit(draft: Omit<VaultRecord, "id" | "lastUpdated">) {
     if (!editRecord) return;
-    startTransition(async () => {
+    startEdit(async () => {
       await updateRecord(editRecord.id, clientId, {
         title: draft.title,
         type: draft.type === "credential" ? "CREDENTIAL" : "SECURE_NOTE",
@@ -153,7 +155,7 @@ export function RecordList({ clientId, initialRecords }: RecordListProps) {
 
   function handleDelete() {
     if (!deleteTarget) return;
-    startTransition(async () => {
+    startDelete(async () => {
       await deleteRecord(deleteTarget.id, clientId);
       setRevealedSecrets((prev) => {
         const next = new Map(prev);
@@ -313,22 +315,24 @@ export function RecordList({ clientId, initialRecords }: RecordListProps) {
       {/* Create */}
       <RecordFormDialog
         open={createOpen}
-        onOpenChange={setCreateOpen}
+        onOpenChange={(o) => { if (!isCreating) setCreateOpen(o); }}
         onSave={handleSaveNew}
+        isPending={isCreating}
       />
 
       {/* Edit */}
       <RecordFormDialog
         open={Boolean(editRecord)}
-        onOpenChange={(o) => { if (!o) setEditRecord(null); }}
+        onOpenChange={(o) => { if (!o && !isEditing) setEditRecord(null); }}
         record={editRecord ?? undefined}
         onSave={handleSaveEdit}
+        isPending={isEditing}
       />
 
       {/* Delete confirmation */}
       <Dialog
         open={Boolean(deleteTarget)}
-        onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}
+        onOpenChange={(o) => { if (!o && !isDeleting) setDeleteTarget(null); }}
       >
         <DialogContent>
           <DialogHeader>
@@ -340,11 +344,11 @@ export function RecordList({ clientId, initialRecords }: RecordListProps) {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
-              {isPending && <Loader2 className="size-4 animate-spin" />}
+            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+              {isDeleting && <Loader2 className="size-4 animate-spin" />}
               Delete record
             </Button>
           </DialogFooter>
