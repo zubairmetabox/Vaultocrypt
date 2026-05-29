@@ -210,15 +210,17 @@ function CategorySection({
           </>
         ) : (
           <>
-            {/* Icon + text: navigate to category page (stops propagation so toggle fires once) */}
+            {/* Icon + text: navigate only — no flex-1 so it stays content-width */}
             <Link
               href={`/categories/${cat.id}`}
               onClick={(e) => e.stopPropagation()}
-              className="flex min-w-0 flex-1 items-center gap-3"
+              className="flex min-w-0 shrink items-center gap-3"
             >
               <Icon className="size-4 shrink-0 transition-transform duration-200 group-hover:scale-105" />
               <span className="truncate">{cat.name}</span>
             </Link>
+            {/* Spacer: fills gap between text and chevron, click bubbles → toggle only */}
+            <span className="flex-1 self-stretch" />
             {/* Chevron: click bubbles up to outer div → toggle only */}
             <ChevronDown
               className={cn(
