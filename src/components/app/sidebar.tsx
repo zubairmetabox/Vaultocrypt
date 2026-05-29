@@ -190,7 +190,7 @@ function CategorySection({
   isOptimistic?: boolean;
 }) {
   const rowClass = cn(
-    "group flex w-full cursor-pointer items-center gap-3 rounded-[1.25rem] px-3 py-3 text-sm font-medium transition-all duration-200",
+    "group flex w-full cursor-default items-center gap-3 rounded-[1.25rem] px-3 py-3 text-sm font-medium transition-all duration-200",
     isOptimistic
       ? "cursor-default text-muted-foreground opacity-60"
       : active
@@ -224,7 +224,7 @@ function CategorySection({
             {/* Chevron: click bubbles up to outer div → toggle only */}
             <ChevronDown
               className={cn(
-                "size-4 shrink-0 transition-transform duration-200",
+                "size-4 shrink-0 cursor-pointer transition-transform duration-200",
                 open && "rotate-180",
               )}
             />
