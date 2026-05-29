@@ -74,13 +74,21 @@ const themeInitScript = `
 })();
 `;
 
-// In JSX:
+// In JSX — use next/script with beforeInteractive.
+// Next.js extracts it from the React tree and injects it into <head> directly.
+// React never sees it during hydration → no React 19 script-tag warning.
+import Script from "next/script";
+
 <head>
-  <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+  <Script id="theme-init" strategy="beforeInteractive">
+    {themeInitScript}
+  </Script>
 </head>
 ```
 
-Add `suppressHydrationWarning` to `<html>` to silence React's hydration warning about the class mismatch.
+Add `suppressHydrationWarning` to `<html>` to silence React's hydration warning about the `.dark` class mismatch.
+
+> ⚠️ Do **not** use `<script dangerouslySetInnerHTML>` directly in JSX. React 19 warns about script tags encountered during client reconciliation.
 
 ---
 
@@ -549,7 +557,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <Script id="theme-init" strategy="beforeInteractive">
+          {themeInitScript}
+        </Script>
       </head>
       <body className="min-h-full font-sans text-foreground">
         <NextTopLoader color="#9edcff" height={2} showSpinner={false} shadow={false} />

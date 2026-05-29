@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import NextTopLoader from "nextjs-toploader";
 import { AuthProvider } from "@/components/auth-provider";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -51,8 +52,14 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* Inline sync script — runs before first paint, prevents dark-mode FOUC */}
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        {/*
+          beforeInteractive: Next.js extracts this from the React tree and injects
+          it directly into the HTML <head> — React never sees it during hydration,
+          so no React 19 script-tag warning. Runs before paint to prevent FOUC.
+        */}
+        <Script id="theme-init" strategy="beforeInteractive">
+          {themeInitScript}
+        </Script>
       </head>
       <body className="min-h-full font-sans text-foreground">
         <NextTopLoader color="#9edcff" height={2} showSpinner={false} shadow={false} />
