@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
   Activity,
@@ -41,6 +42,8 @@ type SidebarProps = {
 };
 
 export function Sidebar({ pathname, categories }: SidebarProps) {
+  const router = useRouter();
+
   const [openMap, setOpenMap] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     for (const cat of categories) {
@@ -52,6 +55,12 @@ export function Sidebar({ pathname, categories }: SidebarProps) {
   });
 
   const [addOpen, setAddOpen] = useState(false);
+
+  // Optimistic categories — cleared as soon as server data refreshes
+  const [optimisticCats, setOptimisticCats] = useState<CategoryWithClients[]>([]);
+  useEffect(() => {
+    setOptimisticCats([]);
+  }, [categories]);
 
   // Auto-open the relevant section when pathname changes
   useEffect(() => {
@@ -70,13 +79,30 @@ export function Sidebar({ pathname, categories }: SidebarProps) {
     setOpenMap((prev) => ({ ...prev, [catId]: !prev[catId] }));
   }
 
+  function handleOptimisticAdd(name: string) {
+    const tempId = `__optimistic__${Date.now()}`;
+    const slug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const tempCat: CategoryWithClients = {
+      id: tempId,
+      name: name.trim(),
+      slug,
+      isDefault: false,
+      order: 999,
+      clients: [],
+    };
+    setOptimisticCats((prev) => [...prev, tempCat]);
+    setOpenMap((prev) => ({ ...prev, [tempId]: false }));
+  }
+
+  const allCats = [...categories, ...optimisticCats];
+
   return (
     <aside className="flex h-full min-h-0 w-full flex-col rounded-[2rem] border border-border/70 bg-sidebar p-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
       <BrandMark />
 
       <nav className="mt-6 flex flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-0.5">
         {/* ── Dynamic category sections ───────────────────────────────────── */}
-        {categories.map((cat) => {
+        {allCats.map((cat) => {
           const Icon = CATEGORY_ICONS[cat.slug] ?? Folder;
           const isActive =
             pathname === `/categories/${cat.id}` ||
@@ -92,6 +118,7 @@ export function Sidebar({ pathname, categories }: SidebarProps) {
               open={isOpen}
               pathname={pathname}
               onToggle={() => toggle(cat.id)}
+              isOptimistic={cat.id.startsWith("__optimistic__")}
             />
           );
         })}
@@ -133,7 +160,12 @@ export function Sidebar({ pathname, categories }: SidebarProps) {
         </div>
       </nav>
 
-      <AddCategoryDialog open={addOpen} onOpenChange={setAddOpen} />
+      <AddCategoryDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onOptimisticAdd={handleOptimisticAdd}
+        onRefresh={() => router.refresh()}
+      />
     </aside>
   );
 }
@@ -147,6 +179,7 @@ function CategorySection({
   open,
   pathname,
   onToggle,
+  isOptimistic,
 }: {
   cat: CategoryWithClients;
   icon: React.ElementType;
@@ -154,30 +187,45 @@ function CategorySection({
   open: boolean;
   pathname: string;
   onToggle: () => void;
+  isOptimistic?: boolean;
 }) {
-  return (
-    <div className="space-y-1.5">
-      <Link
-        href={`/categories/${cat.id}`}
-        onClick={onToggle}
-        className={cn(
-          "group flex w-full items-center gap-3 rounded-[1.25rem] px-3 py-3 text-sm font-medium transition-all duration-200",
-          active
-            ? "border border-border/80 bg-accent text-accent-foreground shadow-lg shadow-slate-950/10"
-            : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
-        )}
-      >
-        <Icon className="size-4 shrink-0 transition-transform duration-200 group-hover:scale-105" />
-        <span className="flex-1 truncate">{cat.name}</span>
+  const rowClass = cn(
+    "group flex w-full items-center gap-3 rounded-[1.25rem] px-3 py-3 text-sm font-medium transition-all duration-200",
+    isOptimistic
+      ? "text-muted-foreground opacity-60 cursor-default"
+      : active
+        ? "border border-border/80 bg-accent text-accent-foreground shadow-lg shadow-slate-950/10"
+        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+  );
+
+  const rowInner = (
+    <>
+      <Icon className="size-4 shrink-0 transition-transform duration-200 group-hover:scale-105" />
+      <span className="flex-1 truncate">{cat.name}</span>
+      {isOptimistic ? (
+        <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+      ) : (
         <ChevronDown
           className={cn(
             "size-4 shrink-0 transition-transform duration-200",
             open && "rotate-180",
           )}
         />
-      </Link>
+      )}
+    </>
+  );
 
-      {open && (
+  return (
+    <div className="space-y-1.5">
+      {isOptimistic ? (
+        <div className={rowClass}>{rowInner}</div>
+      ) : (
+        <Link href={`/categories/${cat.id}`} onClick={onToggle} className={rowClass}>
+          {rowInner}
+        </Link>
+      )}
+
+      {!isOptimistic && open && (
         <div className="rounded-[1.4rem] border border-border/70 bg-card/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
           <div className="sidebar-client-scroll max-h-[18rem] space-y-0.5 overflow-y-auto pr-1">
             {cat.clients.length === 0 ? (
@@ -221,9 +269,13 @@ function ClientLink({ client, pathname }: { client: ClientRow; pathname: string 
 function AddCategoryDialog({
   open,
   onOpenChange,
+  onOptimisticAdd,
+  onRefresh,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
+  onOptimisticAdd: (name: string) => void;
+  onRefresh: () => void;
 }) {
   const [name, setName] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -238,9 +290,13 @@ function AddCategoryDialog({
 
   function handleCreate() {
     if (!name.trim() || isPending) return;
+    const trimmed = name.trim();
+    // Optimistic: show immediately, close dialog, sync in background
+    onOptimisticAdd(trimmed);
+    onOpenChange(false);
     startTransition(async () => {
-      await createCategory(name.trim());
-      onOpenChange(false);
+      await createCategory(trimmed);
+      onRefresh();
     });
   }
 
