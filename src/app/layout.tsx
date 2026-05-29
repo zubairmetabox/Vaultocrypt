@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import NextTopLoader from "nextjs-toploader";
 import { AuthProvider } from "@/components/auth-provider";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -56,6 +57,7 @@ export default function RootLayout({
         </Script>
       </head>
       <body className="min-h-full font-sans text-foreground">
+        <NextTopLoader color="#9edcff" height={2} showSpinner={false} shadow={false} />
         <AuthProvider>
           <ThemeProvider>
             <TooltipProvider>
