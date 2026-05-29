@@ -1,16 +1,16 @@
 import { notFound } from "next/navigation";
 import { AlertTriangle, ShieldCheck } from "lucide-react";
 
-import { ClientDetailsCard } from "@/components/app/client-details-card";
+import { ProjectDetailsCard } from "@/components/app/project-details-card";
 import { RecordList } from "@/components/app/record-list";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { getCategories } from "@/lib/actions/categories";
-import { getClientWithRecords } from "@/lib/actions/clients";
+import { getProjectWithRecords } from "@/lib/actions/projects";
 import type { VaultRecord } from "@/lib/mock-data";
 
-type ClientPageProps = {
-  params: Promise<{ clientId: string }>;
+type ProjectPageProps = {
+  params: Promise<{ projectId: string }>;
 };
 
 function auditRiskBadgeVariant(risk: string) {
@@ -32,17 +32,17 @@ function formatUpdated(date: Date): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-export default async function ClientPage({ params }: ClientPageProps) {
-  const { clientId } = await params;
-  const [client, categories] = await Promise.all([
-    getClientWithRecords(clientId),
+export default async function ProjectPage({ params }: ProjectPageProps) {
+  const { projectId } = await params;
+  const [project, categories] = await Promise.all([
+    getProjectWithRecords(projectId),
     getCategories(),
   ]);
 
-  if (!client) notFound();
+  if (!project) notFound();
 
   // Map DB records → VaultRecord shape expected by RecordList
-  const records: VaultRecord[] = client.records.map((r) => ({
+  const records: VaultRecord[] = project.records.map((r) => ({
     id: r.id,
     title: r.title,
     type: r.type === "CREDENTIAL" ? "credential" : "secure_note",
@@ -54,23 +54,23 @@ export default async function ClientPage({ params }: ClientPageProps) {
     lastUpdated: formatUpdated(r.updatedAt),
   }));
 
-  const elevatedEvents = client.auditEvents.filter(
+  const elevatedEvents = project.auditEvents.filter(
     (e) => e.action === "SECRET_REVEALED" || e.action === "SECRET_COPIED",
   ).length;
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_400px]">
       <div className="space-y-6">
-        <ClientDetailsCard
-          clientId={client.id}
-          initialName={client.name}
-          initialContact={client.contact ?? ""}
-          initialVertical={client.vertical ?? ""}
-          initialStatus={client.status === "ACTIVE" ? "Active" : "Inactive"}
-          currentCategoryId={client.categoryId}
+        <ProjectDetailsCard
+          projectId={project.id}
+          initialName={project.name}
+          initialContact={project.contact ?? ""}
+          initialVertical={project.vertical ?? ""}
+          initialStatus={project.status === "ACTIVE" ? "Active" : "Inactive"}
+          currentCategoryId={project.categoryId}
           categories={categories}
         />
-        <RecordList clientId={client.id} initialRecords={records} categories={categories} />
+        <RecordList projectId={project.id} initialRecords={records} categories={categories} />
       </div>
 
       <aside className="rounded-[1.75rem] border border-border/70 bg-background/85 p-4 shadow-sm xl:sticky xl:top-6 xl:self-start">
@@ -80,7 +80,7 @@ export default async function ClientPage({ params }: ClientPageProps) {
               Audit Trail
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Every reveal, copy, view, and edit tied to this client.
+              Every reveal, copy, view, and edit tied to this project.
             </p>
           </div>
           <div className="rounded-2xl border border-border/70 bg-card/80 p-2">
@@ -98,11 +98,11 @@ export default async function ClientPage({ params }: ClientPageProps) {
           </p>
         </div>
 
-        {client.auditEvents.length === 0 ? (
+        {project.auditEvents.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">No audit events yet.</p>
         ) : (
           <div className="mt-4 space-y-3">
-            {client.auditEvents.map((event) => {
+            {project.auditEvents.map((event) => {
               const actorName = event.actor
                 ? [event.actor.firstName, event.actor.lastName].filter(Boolean).join(" ") ||
                   event.actor.email

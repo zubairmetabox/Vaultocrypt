@@ -2,7 +2,8 @@
 
 import { createContext, useContext } from "react";
 
-const ClientTitleContext = createContext<string | null>(null);
+// Renamed internals to "project" — file kept at same path for backwards compat
+const ProjectTitleContext = createContext<string | null>(null);
 
 export function ClientTitleProvider({
   name,
@@ -12,12 +13,12 @@ export function ClientTitleProvider({
   children: React.ReactNode;
 }) {
   return (
-    <ClientTitleContext.Provider value={name}>
+    <ProjectTitleContext.Provider value={name}>
       {children}
-    </ClientTitleContext.Provider>
+    </ProjectTitleContext.Provider>
   );
 }
 
 export function useClientTitle() {
-  return useContext(ClientTitleContext);
+  return useContext(ProjectTitleContext);
 }

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { ClientDirectory } from "@/components/app/client-directory";
+import { ProjectDirectory } from "@/components/app/project-directory";
 import { getCategories } from "@/lib/actions/categories";
 
 type CategoryPageProps = {
@@ -15,8 +15,8 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   if (!currentCategory) notFound();
 
   return (
-    <ClientDirectory
-      initialClients={currentCategory.clients}
+    <ProjectDirectory
+      initialProjects={currentCategory.projects}
       categories={categories}
       defaultCategoryId={categoryId}
     />

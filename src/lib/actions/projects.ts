@@ -7,13 +7,12 @@ import { prisma as db } from "@/lib/db";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type ClientRow = {
+export type ProjectRow = {
   id: string;
   name: string;
   contact: string | null;
   vertical: string | null;
   status: "ACTIVE" | "INACTIVE";
-  category: "CLIENT" | "INTERNAL"; // kept for legacy compat — use categoryId going forward
   categoryId: string | null;
   isRestricted: boolean;
   recordCount: number;
@@ -23,8 +22,8 @@ export type ClientRow = {
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-export async function getClients(): Promise<ClientRow[]> {
-  const rows = await db.client.findMany({
+export async function getProjects(): Promise<ProjectRow[]> {
+  const rows = await db.project.findMany({
     orderBy: { name: "asc" },
     select: {
       id: true,
@@ -43,19 +42,18 @@ export async function getClients(): Promise<ClientRow[]> {
   return rows.map((r) => ({
     ...r,
     status: r.status as "ACTIVE" | "INACTIVE",
-    category: "CLIENT" as const, // legacy compat
     recordCount: r._count.records,
   }));
 }
 
-export async function getClientName(clientId: string): Promise<string | null> {
-  const row = await db.client.findUnique({ where: { id: clientId }, select: { name: true } });
+export async function getProjectName(projectId: string): Promise<string | null> {
+  const row = await db.project.findUnique({ where: { id: projectId }, select: { name: true } });
   return row?.name ?? null;
 }
 
-export async function getClientWithRecords(clientId: string) {
-  return db.client.findUnique({
-    where: { id: clientId },
+export async function getProjectWithRecords(projectId: string) {
+  return db.project.findUnique({
+    where: { id: projectId },
     include: {
       records: {
         orderBy: { createdAt: "desc" },
@@ -82,11 +80,11 @@ export async function getClientWithRecords(clientId: string) {
   });
 }
 
-export async function getInternalClients() {
+export async function getInternalProjects() {
   const internal = await db.category.findUnique({
     where: { slug: "internal" },
     include: {
-      clients: {
+      projects: {
         orderBy: { name: "asc" },
         include: {
           records: {
@@ -109,20 +107,20 @@ export async function getInternalClients() {
       },
     },
   });
-  return internal?.clients ?? [];
+  return internal?.projects ?? [];
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
-export type CreateClientInput = {
+export type CreateProjectInput = {
   name: string;
   contact?: string;
   vertical?: string;
   categoryId?: string;
 };
 
-export async function createClient(input: CreateClientInput) {
-  const client = await db.client.create({
+export async function createProject(input: CreateProjectInput) {
+  const project = await db.project.create({
     data: {
       name: input.name.trim(),
       contact: input.contact?.trim() ?? null,
@@ -131,10 +129,10 @@ export async function createClient(input: CreateClientInput) {
     },
   });
   revalidatePath("/");
-  return client;
+  return project;
 }
 
-export type UpdateClientInput = {
+export type UpdateProjectInput = {
   name?: string;
   contact?: string;
   vertical?: string;
@@ -142,9 +140,9 @@ export type UpdateClientInput = {
   categoryId?: string;
 };
 
-export async function updateClient(clientId: string, input: UpdateClientInput) {
-  const client = await db.client.update({
-    where: { id: clientId },
+export async function updateProject(projectId: string, input: UpdateProjectInput) {
+  const project = await db.project.update({
+    where: { id: projectId },
     data: {
       ...(input.name !== undefined && { name: input.name.trim() }),
       ...(input.contact !== undefined && { contact: input.contact.trim() || null }),
@@ -154,18 +152,18 @@ export async function updateClient(clientId: string, input: UpdateClientInput) {
     },
   });
   revalidatePath("/");
-  revalidatePath(`/clients/${clientId}`);
-  return client;
+  revalidatePath(`/projects/${projectId}`);
+  return project;
 }
 
-export async function deleteClients(clientIds: string[]) {
-  await db.client.deleteMany({ where: { id: { in: clientIds } } });
+export async function deleteProjects(projectIds: string[]) {
+  await db.project.deleteMany({ where: { id: { in: projectIds } } });
   revalidatePath("/");
 }
 
-export async function moveClients(clientIds: string[], categoryId: string) {
-  await db.client.updateMany({
-    where: { id: { in: clientIds } },
+export async function moveProjects(projectIds: string[], categoryId: string) {
+  await db.project.updateMany({
+    where: { id: { in: projectIds } },
     data: { categoryId },
   });
   revalidatePath("/", "layout");

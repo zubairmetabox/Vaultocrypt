@@ -26,8 +26,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { createCategory } from "@/lib/actions/categories";
-import type { CategoryWithClients } from "@/lib/actions/categories";
-import type { ClientRow } from "@/lib/actions/clients";
+import type { CategoryWithProjects } from "@/lib/actions/categories";
+import type { ProjectRow } from "@/lib/actions/projects";
 import { cn } from "@/lib/utils";
 
 // Icon per slug — defaults to Folder for user-created categories
@@ -38,7 +38,7 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
 
 type SidebarProps = {
   pathname: string;
-  categories: CategoryWithClients[];
+  categories: CategoryWithProjects[];
 };
 
 export function Sidebar({ pathname, categories }: SidebarProps) {
@@ -48,8 +48,8 @@ export function Sidebar({ pathname, categories }: SidebarProps) {
     const initial: Record<string, boolean> = {};
     for (const cat of categories) {
       const onCategoryPath = pathname === `/categories/${cat.id}`;
-      const hasActiveClient = cat.clients.some((c) => pathname === `/clients/${c.id}`);
-      initial[cat.id] = onCategoryPath || hasActiveClient;
+      const hasActiveProject = cat.projects.some((p) => pathname === `/projects/${p.id}`);
+      initial[cat.id] = onCategoryPath || hasActiveProject;
     }
     return initial;
   });
@@ -57,7 +57,7 @@ export function Sidebar({ pathname, categories }: SidebarProps) {
   const [addOpen, setAddOpen] = useState(false);
 
   // Optimistic categories — cleared as soon as server data refreshes
-  const [optimisticCats, setOptimisticCats] = useState<CategoryWithClients[]>([]);
+  const [optimisticCats, setOptimisticCats] = useState<CategoryWithProjects[]>([]);
   useEffect(() => {
     setOptimisticCats([]);
   }, [categories]);
@@ -68,8 +68,8 @@ export function Sidebar({ pathname, categories }: SidebarProps) {
       const next = { ...prev };
       for (const cat of categories) {
         const onCategoryPath = pathname === `/categories/${cat.id}`;
-        const hasActiveClient = cat.clients.some((c) => pathname === `/clients/${c.id}`);
-        if (onCategoryPath || hasActiveClient) next[cat.id] = true;
+        const hasActiveProject = cat.projects.some((p) => pathname === `/projects/${p.id}`);
+        if (onCategoryPath || hasActiveProject) next[cat.id] = true;
       }
       return next;
     });
@@ -82,13 +82,13 @@ export function Sidebar({ pathname, categories }: SidebarProps) {
   function handleOptimisticAdd(name: string) {
     const tempId = `__optimistic__${Date.now()}`;
     const slug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    const tempCat: CategoryWithClients = {
+    const tempCat: CategoryWithProjects = {
       id: tempId,
       name: name.trim(),
       slug,
       isDefault: false,
       order: 999,
-      clients: [],
+      projects: [],
     };
     setOptimisticCats((prev) => [...prev, tempCat]);
     setOpenMap((prev) => ({ ...prev, [tempId]: false }));
@@ -106,7 +106,7 @@ export function Sidebar({ pathname, categories }: SidebarProps) {
           const Icon = CATEGORY_ICONS[cat.slug] ?? Folder;
           const isActive =
             pathname === `/categories/${cat.id}` ||
-            cat.clients.some((c) => pathname === `/clients/${c.id}`);
+            cat.projects.some((p) => pathname === `/projects/${p.id}`);
           const isOpen = openMap[cat.id] ?? false;
 
           return (
@@ -181,7 +181,7 @@ function CategorySection({
   onToggle,
   isOptimistic,
 }: {
-  cat: CategoryWithClients;
+  cat: CategoryWithProjects;
   icon: React.ElementType;
   active: boolean;
   open: boolean;
@@ -235,11 +235,11 @@ function CategorySection({
       {!isOptimistic && open && (
         <div className="rounded-[1.4rem] border border-border/70 bg-card/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
           <div className="sidebar-client-scroll max-h-[18rem] space-y-0.5 overflow-y-auto pr-1">
-            {cat.clients.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-muted-foreground">No clients yet</p>
+            {cat.projects.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-muted-foreground">No projects yet</p>
             ) : (
-              cat.clients.map((client) => (
-                <ClientLink key={client.id} client={client} pathname={pathname} />
+              cat.projects.map((project) => (
+                <ProjectLink key={project.id} project={project} pathname={pathname} />
               ))
             )}
           </div>
@@ -249,13 +249,13 @@ function CategorySection({
   );
 }
 
-// ─── ClientLink ───────────────────────────────────────────────────────────────
+// ─── ProjectLink ───────────────────────────────────────────────────────────────
 
-function ClientLink({ client, pathname }: { client: ClientRow; pathname: string }) {
-  const active = pathname === `/clients/${client.id}`;
+function ProjectLink({ project, pathname }: { project: ProjectRow; pathname: string }) {
+  const active = pathname === `/projects/${project.id}`;
   return (
     <Link
-      href={`/clients/${client.id}`}
+      href={`/projects/${project.id}`}
       className={cn(
         "block rounded-[1rem] px-3 py-2 text-sm transition-all duration-200",
         active
@@ -264,8 +264,8 @@ function ClientLink({ client, pathname }: { client: ClientRow; pathname: string 
       )}
     >
       <div className="flex items-center justify-between gap-3">
-        <span className="truncate">{client.name}</span>
-        <span className="shrink-0 text-xs text-muted-foreground">{client.recordCount}</span>
+        <span className="truncate">{project.name}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">{project.recordCount}</span>
       </div>
     </Link>
   );
@@ -313,7 +313,7 @@ function AddCategoryDialog({
         <DialogHeader>
           <DialogTitle>New category</DialogTitle>
           <DialogDescription>
-            Add a top-level category to organise your clients.
+            Add a top-level category to organise your projects.
           </DialogDescription>
         </DialogHeader>
         <div className="px-6 py-2">

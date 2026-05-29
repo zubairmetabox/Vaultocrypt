@@ -16,16 +16,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import type { CategoryWithClients } from "@/lib/actions/categories";
+import type { CategoryWithProjects } from "@/lib/actions/categories";
 
 type WorkspaceShellProps = {
   children: React.ReactNode;
   clerkEnabled: boolean;
-  categories: CategoryWithClients[];
+  categories: CategoryWithProjects[];
 };
 
 const staticPageMeta: Record<string, { title: string; eyebrow?: string }> = {
-  "/": { title: "Client Directory" },
+  "/": { title: "Project Directory" },
   "/activity": { title: "Activity" },
   "/settings": { title: "Settings", eyebrow: "Preferences and controls" },
 };
@@ -33,15 +33,15 @@ const staticPageMeta: Record<string, { title: string; eyebrow?: string }> = {
 export function WorkspaceShell({ children, clerkEnabled, categories }: WorkspaceShellProps) {
   const pathname = usePathname();
 
-  // All clients flattened — used for breadcrumb on /clients/[id]
-  const allClients = categories.flatMap((c) => c.clients);
+  // All projects flattened — used for breadcrumb on /projects/[id]
+  const allProjects = categories.flatMap((c) => c.projects);
 
-  const activeClientId = pathname.startsWith("/clients/") ? pathname.split("/")[2] : null;
-  const activeClient = activeClientId ? allClients.find((c) => c.id === activeClientId) : null;
+  const activeProjectId = pathname.startsWith("/projects/") ? pathname.split("/")[2] : null;
+  const activeProject = activeProjectId ? allProjects.find((p) => p.id === activeProjectId) : null;
 
-  // The category that owns the active client (drives the breadcrumb parent link)
-  const activeClientCategory = activeClient
-    ? categories.find((c) => c.clients.some((cl) => cl.id === activeClient.id))
+  // The category that owns the active project (drives the breadcrumb parent link)
+  const activeProjectCategory = activeProject
+    ? categories.find((c) => c.projects.some((p) => p.id === activeProject.id))
     : null;
 
   const activeCategoryId = pathname.startsWith("/categories/") ? pathname.split("/")[2] : null;
@@ -50,15 +50,15 @@ export function WorkspaceShell({ children, clerkEnabled, categories }: Workspace
     : null;
 
   let currentPage: { title: string; eyebrow?: string };
-  if (activeClient) {
-    currentPage = { title: activeClient.name };
+  if (activeProject) {
+    currentPage = { title: activeProject.name };
   } else if (activeCategory) {
     currentPage = { title: activeCategory.name };
   } else {
     currentPage = staticPageMeta[pathname] ?? staticPageMeta["/"];
   }
 
-  const showBreadcrumb = Boolean(activeClient);
+  const showBreadcrumb = Boolean(activeProject);
 
   return (
     <div
@@ -96,7 +96,7 @@ export function WorkspaceShell({ children, clerkEnabled, categories }: Workspace
                   <div className="flex w-full max-w-xl items-center gap-2 rounded-[1.25rem] border border-border/70 bg-card/70 px-3 py-2 shadow-sm">
                     <Search className="size-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search clients, records, and notes"
+                      placeholder="Search projects, records, and notes"
                       className="h-auto border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0"
                     />
                   </div>
@@ -111,10 +111,10 @@ export function WorkspaceShell({ children, clerkEnabled, categories }: Workspace
                 {showBreadcrumb ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Link
-                      href={activeClientCategory ? `/categories/${activeClientCategory.id}` : "/"}
+                      href={activeProjectCategory ? `/categories/${activeProjectCategory.id}` : "/"}
                       className="transition-colors duration-200 hover:text-foreground"
                     >
-                      {activeClientCategory?.name ?? "Clients"}
+                      {activeProjectCategory?.name ?? "Projects"}
                     </Link>
                     <span>/</span>
                     <span className="text-foreground">{currentPage.title}</span>

@@ -45,7 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createClient, deleteClients, moveClients, type ClientRow } from "@/lib/actions/clients";
+import { createProject, deleteProjects, moveProjects, type ProjectRow } from "@/lib/actions/projects";
 import { importClients, type ImportClientInput } from "@/lib/actions/import";
 import type { CategoryRow } from "@/lib/actions/categories";
 import { cn } from "@/lib/utils";
@@ -58,7 +58,7 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Props = {
-  initialClients: ClientRow[];
+  initialProjects: ProjectRow[];
   categories: CategoryRow[];
   defaultCategoryId?: string;
 };
@@ -79,7 +79,7 @@ function statusLabel(status: "ACTIVE" | "INACTIVE") {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ClientDirectory({ initialClients, categories, defaultCategoryId }: Props) {
+export function ProjectDirectory({ initialProjects, categories, defaultCategoryId }: Props) {
   const router = useRouter();
 
   const [isPending, startTransition] = useTransition();
@@ -93,7 +93,7 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
 
-  // Add client form state
+  // Add project form state
   const [newName, setNewName] = useState("");
   const [newContact, setNewContact] = useState("");
   const [newVertical, setNewVertical] = useState("");
@@ -107,24 +107,24 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
     setNewCategoryId((prev) => prev || defaultCategoryId || categories[0]?.id || "");
   }, [categories, defaultCategoryId]);
 
-  const clients = initialClients;
+  const projects = initialProjects;
 
   const grouped = useMemo(
     () =>
-      clients
+      projects
         .slice()
         .sort((a, b) => a.name.localeCompare(b.name))
-        .reduce<Record<string, ClientRow[]>>((acc, c) => {
-          const letter = c.name.charAt(0).toUpperCase();
+        .reduce<Record<string, ProjectRow[]>>((acc, p) => {
+          const letter = p.name.charAt(0).toUpperCase();
           if (!acc[letter]) acc[letter] = [];
-          acc[letter].push(c);
+          acc[letter].push(p);
           return acc;
         }, {}),
-    [clients],
+    [projects],
   );
 
   const letters = Object.keys(grouped).sort();
-  const allSelected = clients.length > 0 && selectedIds.length === clients.length;
+  const allSelected = projects.length > 0 && selectedIds.length === projects.length;
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) =>
@@ -133,24 +133,24 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
   }
 
   function toggleSelectAll() {
-    setSelectedIds(allSelected ? [] : clients.map((c) => c.id));
+    setSelectedIds(allSelected ? [] : projects.map((p) => p.id));
   }
 
   // ── Export CSV ──────────────────────────────────────────────────────────────
 
   function exportCsv() {
-    const selected = clients.filter((c) => selectedIds.includes(c.id));
+    const selected = projects.filter((p) => selectedIds.includes(p.id));
     if (!selected.length) return;
 
-    const header = ["id", "category", "name", "contact", "vertical", "status", "record_count"];
-    const rows = selected.map((c) => [
-      c.id, c.category, c.name, c.contact, c.vertical, statusLabel(c.status), c.recordCount,
+    const header = ["id", "name", "contact", "vertical", "status", "record_count"];
+    const rows = selected.map((p) => [
+      p.id, p.name, p.contact, p.vertical, statusLabel(p.status), p.recordCount,
     ]);
     const csv = [header, ...rows].map((r) => r.map(csvEscape).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `vaultocrypt-clients-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `vaultocrypt-projects-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -173,7 +173,7 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
     if (!selectedMoveCategory || isMoving) return;
     setPendingMove(true);
     startMove(async () => {
-      await moveClients(selectedIds, selectedMoveCategory);
+      await moveProjects(selectedIds, selectedMoveCategory);
       router.refresh();
     });
   }
@@ -182,7 +182,7 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
 
   function handleDelete() {
     startTransition(async () => {
-      await deleteClients(selectedIds);
+      await deleteProjects(selectedIds);
       setSelectedIds([]);
       setDeleteOpen(false);
       router.refresh();
@@ -201,7 +201,7 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
   function handleCreate() {
     if (!newName.trim()) return;
     startTransition(async () => {
-      await createClient({
+      await createProject({
         name: newName,
         contact: newContact,
         vertical: newVertical,
@@ -227,7 +227,7 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-3">
             <div>
-              <CardTitle>Client directory</CardTitle>
+              <CardTitle>Project directory</CardTitle>
               <CardDescription>
                 Name-led scanning, visible security posture, and fast access to the next action.
               </CardDescription>
@@ -264,9 +264,9 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Delete selected clients</DialogTitle>
+                        <DialogTitle>Delete selected projects</DialogTitle>
                         <DialogDescription>
-                          Permanently remove {selectedIds.length} client
+                          Permanently remove {selectedIds.length} project
                           {selectedIds.length === 1 ? "" : "s"} and all their records. This cannot
                           be undone.
                         </DialogDescription>
@@ -302,7 +302,7 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
               onImport={handleImport}
             />
 
-            {/* Add client dialog */}
+            {/* Add project dialog */}
             <Dialog
               open={addOpen}
               onOpenChange={(o) => {
@@ -313,20 +313,20 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
               <DialogTrigger asChild>
                 <Button size="lg" className="shadow-lg shadow-cyan-900/10">
                   <Plus className="size-4" />
-                  Add client
+                  Add project
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Create client</DialogTitle>
+                  <DialogTitle>Create project</DialogTitle>
                   <DialogDescription>
-                    Add a new client to the directory.
+                    Add a new project to the directory.
                   </DialogDescription>
                 </DialogHeader>
                 <DialogBody>
                   <div className="grid gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="new-name">Client name</Label>
+                      <Label htmlFor="new-name">Project name</Label>
                       <Input
                         id="new-name"
                         ref={addNameRef}
@@ -383,7 +383,7 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
                     disabled={!newName.trim() || isPending}
                   >
                     {isPending && <Loader2 className="size-4 animate-spin" />}
-                    Create client
+                    Create project
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -393,11 +393,11 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {clients.length === 0 ? (
+        {projects.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-[1.5rem] border border-dashed border-border/70 py-14 text-center">
-            <p className="text-sm font-medium text-foreground">No clients yet</p>
+            <p className="text-sm font-medium text-foreground">No projects yet</p>
             <p className="text-xs text-muted-foreground">
-              Add your first client or import a CSV to get started.
+              Add your first project or import a CSV to get started.
             </p>
           </div>
         ) : (
@@ -410,11 +410,11 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
               </div>
 
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                {grouped[letter].map((client) => {
-                  const selected = selectedIds.includes(client.id);
+                {grouped[letter].map((project) => {
+                  const selected = selectedIds.includes(project.id);
                   return (
                     <div
-                      key={client.id}
+                      key={project.id}
                       className={`group relative rounded-[1.1rem] border bg-background/95 shadow-sm transition-all duration-200 ${
                         selected
                           ? "border-ring/60 bg-accent/20 shadow-md"
@@ -423,23 +423,23 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
                     >
                       <Checkbox
                         checked={selected}
-                        onCheckedChange={() => toggleSelect(client.id)}
-                        aria-label={selected ? `Deselect ${client.name}` : `Select ${client.name}`}
+                        onCheckedChange={() => toggleSelect(project.id)}
+                        aria-label={selected ? `Deselect ${project.name}` : `Select ${project.name}`}
                         className="absolute top-3 right-3 z-10 size-5 rounded-full"
                       />
                       <Link
-                        href={`/clients/${client.id}`}
+                        href={`/projects/${project.id}`}
                         className="flex min-h-20 flex-col justify-between gap-3 px-4 py-3 pr-12"
                       >
                         <p className="text-sm font-medium tracking-tight text-foreground">
-                          {client.name}
+                          {project.name}
                         </p>
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-xs text-muted-foreground">
-                            {client.recordCount} record{client.recordCount === 1 ? "" : "s"}
+                            {project.recordCount} record{project.recordCount === 1 ? "" : "s"}
                           </p>
                           <span className="text-xs text-muted-foreground">
-                            {statusLabel(client.status)}
+                            {statusLabel(project.status)}
                           </span>
                         </div>
                       </Link>
@@ -453,7 +453,7 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
       </CardContent>
     </Card>
 
-    {/* ── Move clients dialog ──────────────────────────────────────────── */}
+    {/* ── Move projects dialog ──────────────────────────────────────────── */}
     <Dialog
       open={moveOpen}
       onOpenChange={(o) => { if (!isMoving) setMoveOpen(o); }}
@@ -464,7 +464,7 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
           <DialogDescription>
             Choose where to move{" "}
             <span className="font-medium text-foreground">
-              {selectedIds.length} client{selectedIds.length === 1 ? "" : "s"}
+              {selectedIds.length} project{selectedIds.length === 1 ? "" : "s"}
             </span>.
           </DialogDescription>
         </DialogHeader>
@@ -473,7 +473,7 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
           {isMoving ? (
             <div className="flex flex-col items-center gap-3 py-8">
               <Loader2 className="size-8 animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Moving clients…</p>
+              <p className="text-sm text-muted-foreground">Moving projects…</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -514,7 +514,7 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
             </Button>
             <Button onClick={handleMove} disabled={!selectedMoveCategory}>
               <ArrowRightLeft className="size-4" />
-              Move clients
+              Move projects
             </Button>
           </DialogFooter>
         )}

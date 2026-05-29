@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { prisma as db } from "@/lib/db";
-import type { ClientRow } from "@/lib/actions/clients";
+import type { ProjectRow } from "@/lib/actions/projects";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -15,8 +15,8 @@ export type CategoryRow = {
   order: number;
 };
 
-export type CategoryWithClients = CategoryRow & {
-  clients: ClientRow[];
+export type CategoryWithProjects = CategoryRow & {
+  projects: ProjectRow[];
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -29,7 +29,6 @@ function toSlug(name: string) {
     .replace(/^-|-$/g, "");
 }
 
-/** Creates the two default categories if they don't exist yet. Idempotent + race-safe. */
 async function ensureDefaults() {
   await db.category.createMany({
     data: [
@@ -40,14 +39,10 @@ async function ensureDefaults() {
   });
 }
 
-/**
- * Any client whose categoryId is null gets moved to the "clients" default.
- * Runs after ensureDefaults so the target category always exists.
- */
 async function migrateOrphans() {
   const clientsCategory = await db.category.findUnique({ where: { slug: "clients" } });
   if (!clientsCategory) return;
-  await db.client.updateMany({
+  await db.project.updateMany({
     where: { categoryId: null },
     data: { categoryId: clientsCategory.id },
   });
@@ -55,14 +50,14 @@ async function migrateOrphans() {
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-export async function getCategories(): Promise<CategoryWithClients[]> {
+export async function getCategories(): Promise<CategoryWithProjects[]> {
   await ensureDefaults();
   await migrateOrphans();
 
   const rows = await db.category.findMany({
     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
     include: {
-      clients: {
+      projects: {
         orderBy: { name: "asc" },
         select: {
           id: true,
@@ -86,27 +81,26 @@ export async function getCategories(): Promise<CategoryWithClients[]> {
     slug: cat.slug,
     isDefault: cat.isDefault,
     order: cat.order,
-    clients: cat.clients.map((c) => ({
-      id: c.id,
-      name: c.name,
-      contact: c.contact,
-      vertical: c.vertical,
-      status: c.status as "ACTIVE" | "INACTIVE",
-      category: cat.name as "CLIENT" | "INTERNAL", // legacy compat field
-      categoryId: c.categoryId,
-      isRestricted: c.isRestricted,
-      recordCount: c._count.records,
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt,
+    projects: cat.projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      contact: p.contact,
+      vertical: p.vertical,
+      status: p.status as "ACTIVE" | "INACTIVE",
+      categoryId: p.categoryId,
+      isRestricted: p.isRestricted,
+      recordCount: p._count.records,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
     })),
   }));
 }
 
-export async function getClientsByCategory(categoryId: string) {
+export async function getProjectsByCategory(categoryId: string) {
   return db.category.findUnique({
     where: { id: categoryId },
     include: {
-      clients: {
+      projects: {
         orderBy: { name: "asc" },
         include: {
           records: {
@@ -156,10 +150,9 @@ export async function updateCategory(id: string, name: string): Promise<Category
 }
 
 export async function deleteCategory(id: string) {
-  // Move all clients in this category to the default "clients" category
   const fallback = await db.category.findUnique({ where: { slug: "clients" } });
   if (fallback) {
-    await db.client.updateMany({ where: { categoryId: id }, data: { categoryId: fallback.id } });
+    await db.project.updateMany({ where: { categoryId: id }, data: { categoryId: fallback.id } });
   }
   await db.category.delete({ where: { id } });
   revalidatePath("/", "layout");

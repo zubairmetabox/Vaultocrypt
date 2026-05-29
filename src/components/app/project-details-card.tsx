@@ -20,66 +20,66 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { CategoryRow } from "@/lib/actions/categories";
-import { updateClient } from "@/lib/actions/clients";
+import { updateProject } from "@/lib/actions/projects";
 import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ClientStatus = "Active" | "Inactive";
+type ProjectStatus = "Active" | "Inactive";
 
-type ClientDetailsCardProps = {
-  clientId: string;
+type ProjectDetailsCardProps = {
+  projectId: string;
   initialName: string;
   initialContact: string;
   initialVertical: string;
-  initialStatus: ClientStatus;
+  initialStatus: ProjectStatus;
   currentCategoryId: string | null;
   categories: CategoryRow[];
 };
 
-type ClientDraft = {
+type ProjectDraft = {
   name: string;
   contact: string;
   vertical: string;
-  status: ClientStatus;
+  status: ProjectStatus;
 };
 
-const statuses: ClientStatus[] = ["Active", "Inactive"];
+const statuses: ProjectStatus[] = ["Active", "Inactive"];
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   clients: FolderKanban,
   internal: Building2,
 };
 
-function statusBadgeVariant(status: ClientStatus) {
+function statusBadgeVariant(status: ProjectStatus) {
   if (status === "Inactive") return "secondary";
   return "outline";
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ClientDetailsCard({
-  clientId,
+export function ProjectDetailsCard({
+  projectId,
   initialName,
   initialContact,
   initialVertical,
   initialStatus,
   currentCategoryId,
   categories,
-}: ClientDetailsCardProps) {
+}: ProjectDetailsCardProps) {
   const router = useRouter();
   const [isEditPending, startEditTransition] = useTransition();
   const [isMovePending, startMoveTransition] = useTransition();
 
   // Edit details state
   const [editOpen, setEditOpen] = useState(false);
-  const [details, setDetails] = useState<ClientDraft>({
+  const [details, setDetails] = useState<ProjectDraft>({
     name: initialName,
     contact: initialContact,
     vertical: initialVertical,
     status: initialStatus,
   });
-  const [draft, setDraft] = useState<ClientDraft>(details);
+  const [draft, setDraft] = useState<ProjectDraft>(details);
 
   // Move category state
   const [moveOpen, setMoveOpen] = useState(false);
@@ -103,13 +103,13 @@ export function ClientDetailsCard({
     if (nextOpen) setDraft(details);
   }
 
-  function updateDraft<K extends keyof ClientDraft>(key: K, value: ClientDraft[K]) {
+  function updateDraft<K extends keyof ProjectDraft>(key: K, value: ProjectDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
   function handleSave() {
     startEditTransition(async () => {
-      await updateClient(clientId, {
+      await updateProject(projectId, {
         name: draft.name,
         contact: draft.contact,
         vertical: draft.vertical,
@@ -135,7 +135,7 @@ export function ClientDetailsCard({
     // Record which category we're moving to — useEffect will apply it when transition ends
     setPendingCategoryId(newCatId);
     startMoveTransition(async () => {
-      await updateClient(clientId, { categoryId: newCatId });
+      await updateProject(projectId, { categoryId: newCatId });
       router.refresh(); // keeps isPending=true until RSC re-render is committed
     });
   }
@@ -232,7 +232,7 @@ export function ClientDetailsCard({
                 </Button>
                 <Button onClick={handleMove} disabled={!selectedCategoryId || isMovePending}>
                   {isMovePending && <Loader2 className="size-4 animate-spin" />}
-                  Move client
+                  Move project
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -248,16 +248,16 @@ export function ClientDetailsCard({
             </DialogTrigger>
             <DialogContent className="sm:max-w-xl">
               <DialogHeader>
-                <DialogTitle>Edit client details</DialogTitle>
+                <DialogTitle>Edit project details</DialogTitle>
                 <DialogDescription>
-                  Update the visible client profile information for this workspace.
+                  Update the visible project profile information for this workspace.
                 </DialogDescription>
               </DialogHeader>
 
               <DialogBody>
                 <div className="grid gap-4">
                   <div className="grid gap-2">
-                    <Label>Client name</Label>
+                    <Label>Project name</Label>
                     <Input
                       value={draft.name}
                       onChange={(e) => updateDraft("name", e.target.value)}

@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { CategoryWithClients } from "@/lib/actions/categories";
+import type { CategoryWithProjects } from "@/lib/actions/categories";
 import { moveRecord } from "@/lib/actions/records";
 import { cn } from "@/lib/utils";
 
@@ -34,7 +34,7 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
   internal: Building2,
 };
 
-type Step = "category" | "client";
+type Step = "category" | "project";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -43,8 +43,8 @@ type Props = {
   onOpenChange: (o: boolean) => void;
   recordId: string;
   recordTitle: string;
-  currentClientId: string;
-  categories: CategoryWithClients[];
+  currentProjectId: string;
+  categories: CategoryWithProjects[];
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -54,15 +54,15 @@ export function MoveRecordDialog({
   onOpenChange,
   recordId,
   recordTitle,
-  currentClientId,
+  currentProjectId,
   categories,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   const [step, setStep] = useState<Step>("category");
-  const [selectedCategory, setSelectedCategory] = useState<CategoryWithClients | null>(null);
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<CategoryWithProjects | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = useState(false);
 
   // Reset state when dialog opens
@@ -70,7 +70,7 @@ export function MoveRecordDialog({
     if (open) {
       setStep("category");
       setSelectedCategory(null);
-      setSelectedClientId(null);
+      setSelectedProjectId(null);
       setPendingMove(false);
     }
   }, [open]);
@@ -83,24 +83,24 @@ export function MoveRecordDialog({
     }
   }, [isPending, pendingMove, onOpenChange]);
 
-  function handleCategorySelect(cat: CategoryWithClients) {
+  function handleCategorySelect(cat: CategoryWithProjects) {
     setSelectedCategory(cat);
-    setSelectedClientId(null);
-    setStep("client");
+    setSelectedProjectId(null);
+    setStep("project");
   }
 
   function handleMove() {
-    if (!selectedClientId || isPending) return;
+    if (!selectedProjectId || isPending) return;
     setPendingMove(true);
     startTransition(async () => {
-      await moveRecord(recordId, currentClientId, selectedClientId);
+      await moveRecord(recordId, currentProjectId, selectedProjectId);
       router.refresh();
     });
   }
 
-  // Clients available to move to (exclude current client)
-  const availableClients = selectedCategory
-    ? selectedCategory.clients.filter((c) => c.id !== currentClientId)
+  // Projects available to move to (exclude current project)
+  const availableProjects = selectedCategory
+    ? selectedCategory.projects.filter((p) => p.id !== currentProjectId)
     : [];
 
   // ── Loading state ──────────────────────────────────────────────────────────
@@ -157,7 +157,7 @@ export function MoveRecordDialog({
                     </div>
                     <span className="flex-1 font-medium">{cat.name}</span>
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {cat.clients.length} client{cat.clients.length === 1 ? "" : "s"}
+                      {cat.projects.length} project{cat.projects.length === 1 ? "" : "s"}
                     </span>
                   </button>
                 );
@@ -175,7 +175,7 @@ export function MoveRecordDialog({
     );
   }
 
-  // ── Step 2: Choose client ──────────────────────────────────────────────────
+  // ── Step 2: Choose project ──────────────────────────────────────────────────
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -183,25 +183,25 @@ export function MoveRecordDialog({
         <DialogHeader>
           <DialogTitle>{selectedCategory?.name}</DialogTitle>
           <DialogDescription>
-            Select a client to move{" "}
+            Select a project to move{" "}
             <span className="font-medium text-foreground">{recordTitle}</span> to.
           </DialogDescription>
         </DialogHeader>
 
         <DialogBody>
-          {availableClients.length === 0 ? (
+          {availableProjects.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              No other clients in this category.
+              No other projects in this category.
             </p>
           ) : (
             <div className="space-y-2">
-              {availableClients.map((client) => {
-                const isSelected = selectedClientId === client.id;
+              {availableProjects.map((project) => {
+                const isSelected = selectedProjectId === project.id;
                 return (
                   <button
-                    key={client.id}
+                    key={project.id}
                     type="button"
-                    onClick={() => setSelectedClientId(client.id)}
+                    onClick={() => setSelectedProjectId(project.id)}
                     className={cn(
                       "flex w-full items-center gap-3 rounded-[1.25rem] border px-4 py-3 text-left text-sm transition-all duration-150",
                       isSelected
@@ -223,9 +223,9 @@ export function MoveRecordDialog({
                       />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{client.name}</p>
-                      {client.contact && (
-                        <p className="truncate text-xs text-muted-foreground">{client.contact}</p>
+                      <p className="truncate font-medium">{project.name}</p>
+                      {project.contact && (
+                        <p className="truncate text-xs text-muted-foreground">{project.contact}</p>
                       )}
                     </div>
                     {isSelected && <Check className="size-4 shrink-0 text-primary" />}
@@ -239,12 +239,12 @@ export function MoveRecordDialog({
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={() => { setStep("category"); setSelectedClientId(null); }}
+            onClick={() => { setStep("category"); setSelectedProjectId(null); }}
           >
             <ArrowLeft className="size-4" />
             Back
           </Button>
-          <Button onClick={handleMove} disabled={!selectedClientId}>
+          <Button onClick={handleMove} disabled={!selectedProjectId}>
             <ArrowRightLeft className="size-4" />
             Move record
           </Button>

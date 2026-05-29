@@ -10,7 +10,7 @@ import { prisma as db } from "@/lib/db";
 
 export type RecordRow = {
   id: string;
-  clientId: string;
+  projectId: string;
   title: string;
   type: "CREDENTIAL" | "SECURE_NOTE";
   serviceName: string | null;
@@ -26,13 +26,13 @@ export type RecordRow = {
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 /** Returns record metadata — no secret. Used for the record listing. */
-export async function getRecords(clientId: string): Promise<RecordRow[]> {
+export async function getRecords(projectId: string): Promise<RecordRow[]> {
   return db.record.findMany({
-    where: { clientId },
+    where: { projectId },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
-      clientId: true,
+      projectId: true,
       title: true,
       type: true,
       serviceName: true,
@@ -63,7 +63,7 @@ export async function revealSecret(recordId: string): Promise<string> {
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export type CreateRecordInput = {
-  clientId: string;
+  projectId: string;
   title: string;
   type: "CREDENTIAL" | "SECURE_NOTE";
   serviceName?: string;
@@ -77,7 +77,7 @@ export type CreateRecordInput = {
 export async function createRecord(input: CreateRecordInput) {
   const record = await db.record.create({
     data: {
-      clientId: input.clientId,
+      projectId: input.projectId,
       title: input.title.trim(),
       type: input.type as RecordType,
       serviceName: input.serviceName?.trim() || null,
@@ -88,7 +88,7 @@ export async function createRecord(input: CreateRecordInput) {
       sensitivity: (input.sensitivity as RecordSensitivity) ?? RecordSensitivity.SENSITIVE,
     },
   });
-  revalidatePath(`/clients/${input.clientId}`);
+  revalidatePath(`/projects/${input.projectId}`);
   return record;
 }
 
@@ -103,7 +103,7 @@ export type UpdateRecordInput = {
   sensitivity?: "STANDARD" | "SENSITIVE";
 };
 
-export async function updateRecord(recordId: string, clientId: string, input: UpdateRecordInput) {
+export async function updateRecord(recordId: string, projectId: string, input: UpdateRecordInput) {
   const record = await db.record.update({
     where: { id: recordId },
     data: {
@@ -119,17 +119,17 @@ export async function updateRecord(recordId: string, clientId: string, input: Up
       ...(input.sensitivity !== undefined && { sensitivity: input.sensitivity as RecordSensitivity }),
     },
   });
-  revalidatePath(`/clients/${clientId}`);
+  revalidatePath(`/projects/${projectId}`);
   return record;
 }
 
-export async function deleteRecord(recordId: string, clientId: string) {
+export async function deleteRecord(recordId: string, projectId: string) {
   await db.record.delete({ where: { id: recordId } });
-  revalidatePath(`/clients/${clientId}`);
+  revalidatePath(`/projects/${projectId}`);
 }
 
-export async function moveRecord(recordId: string, fromClientId: string, toClientId: string) {
-  await db.record.update({ where: { id: recordId }, data: { clientId: toClientId } });
-  revalidatePath(`/clients/${fromClientId}`);
-  revalidatePath(`/clients/${toClientId}`);
+export async function moveRecord(recordId: string, fromProjectId: string, toProjectId: string) {
+  await db.record.update({ where: { id: recordId }, data: { projectId: toProjectId } });
+  revalidatePath(`/projects/${fromProjectId}`);
+  revalidatePath(`/projects/${toProjectId}`);
 }

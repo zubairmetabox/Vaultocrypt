@@ -36,18 +36,18 @@ import {
   revealSecret,
   updateRecord,
 } from "@/lib/actions/records";
-import type { CategoryWithClients } from "@/lib/actions/categories";
+import type { CategoryWithProjects } from "@/lib/actions/categories";
 import type { VaultRecord } from "@/lib/mock-data";
 
 type RecordListProps = {
-  clientId: string;
+  projectId: string;
   initialRecords: VaultRecord[];
-  categories?: CategoryWithClients[];
+  categories?: CategoryWithProjects[];
 };
 
 type DeleteTarget = { id: string; title: string } | null;
 
-export function RecordList({ clientId, initialRecords, categories }: RecordListProps) {
+export function RecordList({ projectId, initialRecords, categories }: RecordListProps) {
   const router = useRouter();
   const [isCreating, startCreate] = useTransition();
   const [isEditing, startEdit] = useTransition();
@@ -129,7 +129,7 @@ export function RecordList({ clientId, initialRecords, categories }: RecordListP
 
     startCreate(async () => {
       await createRecord({
-        clientId,
+        projectId,
         title: draft.title,
         type: draft.type === "credential" ? "CREDENTIAL" : "SECURE_NOTE",
         serviceName: draft.service,
@@ -155,7 +155,7 @@ export function RecordList({ clientId, initialRecords, categories }: RecordListP
     setEditRecord(null);
 
     startEdit(async () => {
-      await updateRecord(editRecord.id, clientId, {
+      await updateRecord(editRecord.id, projectId, {
         title: draft.title,
         type: draft.type === "credential" ? "CREDENTIAL" : "SECURE_NOTE",
         serviceName: draft.service,
@@ -184,7 +184,7 @@ export function RecordList({ clientId, initialRecords, categories }: RecordListP
     setDeleteTarget(null);
 
     startDelete(async () => {
-      await deleteRecord(targetId, clientId);
+      await deleteRecord(targetId, projectId);
       router.refresh();
     });
   }
@@ -209,7 +209,7 @@ export function RecordList({ clientId, initialRecords, categories }: RecordListP
               <div>
                 <p className="text-sm font-medium text-foreground">No records yet</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Add the first credential or secure note for this client.
+                  Add the first credential or secure note for this project.
                 </p>
               </div>
               <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
@@ -367,7 +367,7 @@ export function RecordList({ clientId, initialRecords, categories }: RecordListP
             <DialogDescription>
               Permanently remove{" "}
               <span className="font-medium text-foreground">{deleteTarget?.title}</span> from this
-              client. This cannot be undone.
+              project. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -389,7 +389,7 @@ export function RecordList({ clientId, initialRecords, categories }: RecordListP
           onOpenChange={(o) => { if (!o) setMoveTarget(null); }}
           recordId={moveTarget.id}
           recordTitle={moveTarget.title}
-          currentClientId={clientId}
+          currentProjectId={projectId}
           categories={categories}
         />
       )}
