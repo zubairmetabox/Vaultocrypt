@@ -3,7 +3,18 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Download, FileUp, Loader2, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Building2,
+  Check,
+  Download,
+  FileUp,
+  Folder,
+  FolderKanban,
+  Loader2,
+  Plus,
+  Trash2,
+} from "lucide-react";
 
 import { ImportDialog } from "@/components/app/import-dialog";
 import { Button } from "@/components/ui/button";
@@ -34,9 +45,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createClient, deleteClients, type ClientRow } from "@/lib/actions/clients";
+import { createClient, deleteClients, moveClients, type ClientRow } from "@/lib/actions/clients";
 import { importClients, type ImportClientInput } from "@/lib/actions/import";
 import type { CategoryRow } from "@/lib/actions/categories";
+import { cn } from "@/lib/utils";
+
+const CATEGORY_ICONS: Record<string, React.ElementType> = {
+  clients: FolderKanban,
+  internal: Building2,
+};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,10 +81,15 @@ function statusLabel(status: "ACTIVE" | "INACTIVE") {
 
 export function ClientDirectory({ initialClients, categories, defaultCategoryId }: Props) {
   const router = useRouter();
+
   const [isPending, startTransition] = useTransition();
+  const [isMoving, startMove] = useTransition();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [selectedMoveCategory, setSelectedMoveCategory] = useState<string | null>(null);
+  const [pendingMove, setPendingMove] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
 
@@ -135,6 +157,27 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
     URL.revokeObjectURL(url);
   }
 
+  // ── Move ────────────────────────────────────────────────────────────────────
+
+  // Close move dialog once transition ends (page fully refreshed)
+  useEffect(() => {
+    if (!isMoving && pendingMove) {
+      setMoveOpen(false);
+      setSelectedIds([]);
+      setSelectedMoveCategory(null);
+      setPendingMove(false);
+    }
+  }, [isMoving, pendingMove]);
+
+  function handleMove() {
+    if (!selectedMoveCategory || isMoving) return;
+    setPendingMove(true);
+    startMove(async () => {
+      await moveClients(selectedIds, selectedMoveCategory);
+      router.refresh();
+    });
+  }
+
   // ── Delete ──────────────────────────────────────────────────────────────────
 
   function handleDelete() {
@@ -178,6 +221,7 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
   }
 
   return (
+    <>
     <Card className="border-border/70 bg-card/95">
       <CardHeader className="gap-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -202,6 +246,14 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
                   <Button size="sm" variant="outline" onClick={exportCsv}>
                     <Download className="size-4" />
                     Export CSV
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setSelectedMoveCategory(null); setMoveOpen(true); }}
+                  >
+                    <ArrowRightLeft className="size-4" />
+                    Move
                   </Button>
                   <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
                     <DialogTrigger asChild>
@@ -400,5 +452,74 @@ export function ClientDirectory({ initialClients, categories, defaultCategoryId 
         )}
       </CardContent>
     </Card>
+
+    {/* ── Move clients dialog ──────────────────────────────────────────── */}
+    <Dialog
+      open={moveOpen}
+      onOpenChange={(o) => { if (!isMoving) setMoveOpen(o); }}
+    >
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Move to category</DialogTitle>
+          <DialogDescription>
+            Choose where to move{" "}
+            <span className="font-medium text-foreground">
+              {selectedIds.length} client{selectedIds.length === 1 ? "" : "s"}
+            </span>.
+          </DialogDescription>
+        </DialogHeader>
+
+        <DialogBody>
+          {isMoving ? (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <Loader2 className="size-8 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Moving clients…</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {categories.map((cat) => {
+                const Icon = CATEGORY_ICONS[cat.slug] ?? Folder;
+                const isSelected = selectedMoveCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedMoveCategory(cat.id)}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-[1.25rem] border px-4 py-3 text-left text-sm transition-all duration-150",
+                      isSelected
+                        ? "border-primary/50 bg-primary/8 text-foreground"
+                        : "border-border/70 bg-card/60 text-muted-foreground hover:border-border hover:bg-muted/60 hover:text-foreground",
+                    )}
+                  >
+                    <div className={cn(
+                      "flex size-8 shrink-0 items-center justify-center rounded-xl transition-colors",
+                      isSelected ? "bg-primary/15" : "bg-muted",
+                    )}>
+                      <Icon className={cn("size-4", isSelected ? "text-primary" : "text-muted-foreground")} />
+                    </div>
+                    <span className="flex-1 font-medium">{cat.name}</span>
+                    {isSelected && <Check className="size-4 shrink-0 text-primary" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </DialogBody>
+
+        {!isMoving && (
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoveOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleMove} disabled={!selectedMoveCategory}>
+              <ArrowRightLeft className="size-4" />
+              Move clients
+            </Button>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

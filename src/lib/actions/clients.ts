@@ -162,3 +162,11 @@ export async function deleteClients(clientIds: string[]) {
   await db.client.deleteMany({ where: { id: { in: clientIds } } });
   revalidatePath("/");
 }
+
+export async function moveClients(clientIds: string[], categoryId: string) {
+  await db.client.updateMany({
+    where: { id: { in: clientIds } },
+    data: { categoryId },
+  });
+  revalidatePath("/", "layout");
+}
