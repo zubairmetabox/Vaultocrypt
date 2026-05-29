@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ClientCategory, ClientStatus, RecordType } from "@prisma/client";
+import { ClientStatus, RecordType } from "@prisma/client";
 
 import { encrypt } from "@/lib/crypto";
 import { prisma as db } from "@/lib/db";
@@ -10,7 +10,7 @@ export type ImportClientInput = {
   name: string;
   contact?: string;
   vertical?: string;
-  category?: "CLIENT" | "INTERNAL";
+  categoryId?: string;
   status?: "ACTIVE" | "INACTIVE";
   records: Array<{
     title: string;
@@ -33,7 +33,7 @@ export async function importClients(clients: ImportClientInput[]) {
         name: c.name.trim(),
         contact: c.contact?.trim() || null,
         vertical: c.vertical?.trim() || null,
-        category: (c.category as ClientCategory) ?? ClientCategory.CLIENT,
+        categoryId: c.categoryId ?? null,
         status: (c.status as ClientStatus) ?? ClientStatus.ACTIVE,
         records: {
           create: c.records.map((r) => ({

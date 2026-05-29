@@ -1,97 +1,112 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   Activity,
   Building2,
   ChevronDown,
+  Folder,
   FolderKanban,
+  Loader2,
+  Plus,
   Settings2,
 } from "lucide-react";
 
 import { BrandMark } from "@/components/app/brand-mark";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { createCategory } from "@/lib/actions/categories";
+import type { CategoryWithClients } from "@/lib/actions/categories";
 import type { ClientRow } from "@/lib/actions/clients";
 import { cn } from "@/lib/utils";
 
-type SidebarProps = {
-  pathname: string;
-  clients: ClientRow[];
+// Icon per slug — defaults to Folder for user-created categories
+const CATEGORY_ICONS: Record<string, React.ElementType> = {
+  clients: FolderKanban,
+  internal: Building2,
 };
 
-export function Sidebar({ pathname, clients }: SidebarProps) {
-  const clientClients = useMemo(
-    () =>
-      clients
-        .filter((c) => c.category === "CLIENT")
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [clients],
-  );
+type SidebarProps = {
+  pathname: string;
+  categories: CategoryWithClients[];
+};
 
-  const internalClients = useMemo(
-    () =>
-      clients
-        .filter((c) => c.category === "INTERNAL")
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [clients],
-  );
+export function Sidebar({ pathname, categories }: SidebarProps) {
+  const [openMap, setOpenMap] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    for (const cat of categories) {
+      const onCategoryPath = pathname === `/categories/${cat.id}`;
+      const hasActiveClient = cat.clients.some((c) => pathname === `/clients/${c.id}`);
+      initial[cat.id] = onCategoryPath || hasActiveClient;
+    }
+    return initial;
+  });
 
-  const onClientPath = pathname === "/" || pathname.startsWith("/clients/");
-  const onInternalPath = pathname === "/internal" || pathname.startsWith("/internal/");
+  const [addOpen, setAddOpen] = useState(false);
 
-  const [clientsOpen, setClientsOpen] = useState(onClientPath);
-  const [internalOpen, setInternalOpen] = useState(onInternalPath);
-
+  // Auto-open the relevant section when pathname changes
   useEffect(() => {
-    if (onClientPath) setClientsOpen(true);
-  }, [onClientPath]);
+    setOpenMap((prev) => {
+      const next = { ...prev };
+      for (const cat of categories) {
+        const onCategoryPath = pathname === `/categories/${cat.id}`;
+        const hasActiveClient = cat.clients.some((c) => pathname === `/clients/${c.id}`);
+        if (onCategoryPath || hasActiveClient) next[cat.id] = true;
+      }
+      return next;
+    });
+  }, [pathname, categories]);
 
-  useEffect(() => {
-    if (onInternalPath) setInternalOpen(true);
-  }, [onInternalPath]);
+  function toggle(catId: string) {
+    setOpenMap((prev) => ({ ...prev, [catId]: !prev[catId] }));
+  }
 
   return (
     <aside className="flex h-full min-h-0 w-full flex-col rounded-[2rem] border border-border/70 bg-sidebar p-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
       <BrandMark />
 
-      <nav className="mt-6 flex flex-1 flex-col gap-2 overflow-hidden">
-        {/* ── Clients ────────────────────────────────────────────────────── */}
-        <SidebarSection
-          label="Clients"
-          icon={FolderKanban}
-          href="/"
-          active={onClientPath}
-          open={clientsOpen}
-          onToggle={() => setClientsOpen((o) => !o)}
-        >
-          {clientClients.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-muted-foreground">No clients yet</p>
-          ) : (
-            clientClients.map((client) => (
-              <ClientLink key={client.id} client={client} pathname={pathname} />
-            ))
-          )}
-        </SidebarSection>
+      <nav className="mt-6 flex flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-0.5">
+        {/* ── Dynamic category sections ───────────────────────────────────── */}
+        {categories.map((cat) => {
+          const Icon = CATEGORY_ICONS[cat.slug] ?? Folder;
+          const isActive =
+            pathname === `/categories/${cat.id}` ||
+            cat.clients.some((c) => pathname === `/clients/${c.id}`);
+          const isOpen = openMap[cat.id] ?? false;
 
-        {/* ── Internal ───────────────────────────────────────────────────── */}
-        <SidebarSection
-          label="Internal"
-          icon={Building2}
-          href="/internal"
-          active={onInternalPath}
-          open={internalOpen}
-          onToggle={() => setInternalOpen((o) => !o)}
-        >
-          {internalClients.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-muted-foreground">No internal entries yet</p>
-          ) : (
-            internalClients.map((client) => (
-              <ClientLink key={client.id} client={client} pathname={pathname} />
-            ))
-          )}
-        </SidebarSection>
+          return (
+            <CategorySection
+              key={cat.id}
+              cat={cat}
+              icon={Icon}
+              active={isActive}
+              open={isOpen}
+              pathname={pathname}
+              onToggle={() => toggle(cat.id)}
+            />
+          );
+        })}
 
-        {/* ── Bottom nav ─────────────────────────────────────────────────── */}
+        {/* ── Add category ────────────────────────────────────────────────── */}
+        <button
+          type="button"
+          onClick={() => setAddOpen(true)}
+          className="flex items-center gap-2 rounded-[1.25rem] px-3 py-2 text-xs font-medium text-muted-foreground transition-all duration-200 hover:bg-muted/70 hover:text-foreground"
+        >
+          <Plus className="size-3.5" />
+          Add category
+        </button>
+
+        {/* ── Bottom nav ──────────────────────────────────────────────────── */}
         <div className="mt-auto space-y-1 pt-2">
           {[
             { href: "/activity", label: "Activity", icon: Activity },
@@ -117,35 +132,33 @@ export function Sidebar({ pathname, clients }: SidebarProps) {
           })}
         </div>
       </nav>
+
+      <AddCategoryDialog open={addOpen} onOpenChange={setAddOpen} />
     </aside>
   );
 }
 
-// ─── SidebarSection ───────────────────────────────────────────────────────────
-// Clicking the row navigates to href AND toggles the list open/closed.
+// ─── CategorySection ──────────────────────────────────────────────────────────
 
-function SidebarSection({
-  label,
+function CategorySection({
+  cat,
   icon: Icon,
-  href,
   active,
   open,
+  pathname,
   onToggle,
-  children,
 }: {
-  label: string;
+  cat: CategoryWithClients;
   icon: React.ElementType;
-  href: string;
   active: boolean;
   open: boolean;
+  pathname: string;
   onToggle: () => void;
-  children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-2">
-      {/* Single unified row: navigate + toggle */}
+    <div className="space-y-1.5">
       <Link
-        href={href}
+        href={`/categories/${cat.id}`}
         onClick={onToggle}
         className={cn(
           "group flex w-full items-center gap-3 rounded-[1.25rem] px-3 py-3 text-sm font-medium transition-all duration-200",
@@ -155,7 +168,7 @@ function SidebarSection({
         )}
       >
         <Icon className="size-4 shrink-0 transition-transform duration-200 group-hover:scale-105" />
-        <span className="flex-1">{label}</span>
+        <span className="flex-1 truncate">{cat.name}</span>
         <ChevronDown
           className={cn(
             "size-4 shrink-0 transition-transform duration-200",
@@ -166,8 +179,14 @@ function SidebarSection({
 
       {open && (
         <div className="rounded-[1.4rem] border border-border/70 bg-card/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-          <div className="sidebar-client-scroll max-h-[18rem] space-y-1 overflow-y-auto pr-1">
-            {children}
+          <div className="sidebar-client-scroll max-h-[18rem] space-y-0.5 overflow-y-auto pr-1">
+            {cat.clients.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-muted-foreground">No clients yet</p>
+            ) : (
+              cat.clients.map((client) => (
+                <ClientLink key={client.id} client={client} pathname={pathname} />
+              ))
+            )}
           </div>
         </div>
       )}
@@ -194,5 +213,66 @@ function ClientLink({ client, pathname }: { client: ClientRow; pathname: string 
         <span className="shrink-0 text-xs text-muted-foreground">{client.recordCount}</span>
       </div>
     </Link>
+  );
+}
+
+// ─── AddCategoryDialog ────────────────────────────────────────────────────────
+
+function AddCategoryDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const [name, setName] = useState("");
+  const [isPending, startTransition] = useTransition();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setName("");
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [open]);
+
+  function handleCreate() {
+    if (!name.trim() || isPending) return;
+    startTransition(async () => {
+      await createCategory(name.trim());
+      onOpenChange(false);
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!isPending) onOpenChange(o); }}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>New category</DialogTitle>
+          <DialogDescription>
+            Add a top-level category to organise your clients.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="px-6 py-2">
+          <Input
+            ref={inputRef}
+            placeholder="e.g. Partners"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            disabled={isPending}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
+            Cancel
+          </Button>
+          <Button onClick={handleCreate} disabled={!name.trim() || isPending}>
+            {isPending && <Loader2 className="size-4 animate-spin" />}
+            Create
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

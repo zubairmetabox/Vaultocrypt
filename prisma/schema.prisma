@@ -17,11 +17,6 @@ enum ClientStatus {
   INACTIVE
 }
 
-enum ClientCategory {
-  CLIENT
-  INTERNAL
-}
-
 enum RecordType {
   CREDENTIAL
   SECURE_NOTE
@@ -47,6 +42,17 @@ enum AuditAction {
   RESTRICTION_CHANGED
 }
 
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  isDefault Boolean  @default(false)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  clients   Client[]
+}
+
 model User {
   id          String       @id @default(cuid())
   clerkUserId String       @unique
@@ -61,23 +67,26 @@ model User {
 }
 
 model Client {
-  id           String         @id @default(cuid())
+  id           String        @id @default(cuid())
   name         String
   contact      String?
   vertical     String?
   notes        String?
-  status       ClientStatus   @default(ACTIVE)
-  category     ClientCategory @default(CLIENT)
-  isRestricted Boolean        @default(false)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  status       ClientStatus  @default(ACTIVE)
+  categoryId   String?
+  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  isRestricted Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   records      Record[]
-  tags         Tag[]          @relation("ClientTags")
+  tags         Tag[]         @relation("ClientTags")
   auditEvents  AuditEvent[]
+
+  @@index([categoryId])
 }
 
 model Record {
-  id            String       @id @default(cuid())
+  id            String            @id @default(cuid())
   clientId      String
   title         String
   type          RecordType
@@ -88,12 +97,12 @@ model Record {
   notes         String?
   sensitivity   RecordSensitivity @default(SENSITIVE)
   isRestricted  Boolean           @default(false)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
   createdById   String?
   updatedById   String?
-  client        Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  tags          Tag[]        @relation("RecordTags")
+  client        Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tags          Tag[]             @relation("RecordTags")
   auditEvents   AuditEvent[]
 
   @@index([clientId])

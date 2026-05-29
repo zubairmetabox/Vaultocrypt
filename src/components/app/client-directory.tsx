@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Download, FileUp, Loader2, Plus, Trash2 } from "lucide-react";
 
 import { ImportDialog } from "@/components/app/import-dialog";
@@ -36,11 +36,13 @@ import {
 } from "@/components/ui/select";
 import { createClient, deleteClients, type ClientRow } from "@/lib/actions/clients";
 import { importClients, type ImportClientInput } from "@/lib/actions/import";
+import type { CategoryRow } from "@/lib/actions/categories";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Props = {
   initialClients: ClientRow[];
+  categories: CategoryRow[];
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -59,7 +61,7 @@ function statusLabel(status: "ACTIVE" | "INACTIVE") {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ClientDirectory({ initialClients }: Props) {
+export function ClientDirectory({ initialClients, categories }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -72,8 +74,13 @@ export function ClientDirectory({ initialClients }: Props) {
   const [newName, setNewName] = useState("");
   const [newContact, setNewContact] = useState("");
   const [newVertical, setNewVertical] = useState("");
-  const [newCategory, setNewCategory] = useState<"CLIENT" | "INTERNAL">("CLIENT");
+  const [newCategoryId, setNewCategoryId] = useState<string>(() => categories[0]?.id ?? "");
   const addNameRef = useRef<HTMLInputElement>(null);
+
+  // Keep default in sync if categories load after first render
+  useEffect(() => {
+    setNewCategoryId((prev) => prev || categories[0]?.id || "");
+  }, [categories]);
 
   const clients = initialClients;
 
@@ -142,7 +149,7 @@ export function ClientDirectory({ initialClients }: Props) {
     setNewName("");
     setNewContact("");
     setNewVertical("");
-    setNewCategory("CLIENT");
+    setNewCategoryId(categories[0]?.id ?? "");
   }
 
   function handleCreate() {
@@ -152,7 +159,7 @@ export function ClientDirectory({ initialClients }: Props) {
         name: newName,
         contact: newContact,
         vertical: newVertical,
-        category: newCategory,
+        categoryId: newCategoryId || undefined,
       });
       resetAddForm();
       setAddOpen(false);
@@ -295,15 +302,18 @@ export function ClientDirectory({ initialClients }: Props) {
                     <div className="grid gap-2">
                       <Label>Category</Label>
                       <Select
-                        value={newCategory}
-                        onValueChange={(v) => setNewCategory(v as "CLIENT" | "INTERNAL")}
+                        value={newCategoryId}
+                        onValueChange={setNewCategoryId}
                       >
                         <SelectTrigger className="w-full">
-                          <SelectValue />
+                          <SelectValue placeholder="Select a category" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="CLIENT">Client</SelectItem>
-                          <SelectItem value="INTERNAL">Internal</SelectItem>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>

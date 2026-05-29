@@ -1,5 +1,5 @@
 import { WorkspaceShell } from "@/components/app/workspace-shell";
-import { getClients } from "@/lib/actions/clients";
+import { getCategories } from "@/lib/actions/categories";
 
 export default async function WorkspaceLayout({
   children,
@@ -10,10 +10,10 @@ export default async function WorkspaceLayout({
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY,
   );
 
-  const clients = await getClients();
+  const categories = await getCategories();
 
   return (
-    <WorkspaceShell clerkEnabled={clerkEnabled} clients={clients}>
+    <WorkspaceShell clerkEnabled={clerkEnabled} categories={categories}>
       {children}
     </WorkspaceShell>
   );

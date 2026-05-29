@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ClientCategory, ClientStatus } from "@prisma/client";
+import { ClientStatus } from "@prisma/client";
 
 import { prisma as db } from "@/lib/db";
 
@@ -13,7 +13,8 @@ export type ClientRow = {
   contact: string | null;
   vertical: string | null;
   status: "ACTIVE" | "INACTIVE";
-  category: "CLIENT" | "INTERNAL";
+  category: "CLIENT" | "INTERNAL"; // kept for legacy compat — use categoryId going forward
+  categoryId: string | null;
   isRestricted: boolean;
   recordCount: number;
   createdAt: Date;
@@ -31,7 +32,7 @@ export async function getClients(): Promise<ClientRow[]> {
       contact: true,
       vertical: true,
       status: true,
-      category: true,
+      categoryId: true,
       isRestricted: true,
       createdAt: true,
       updatedAt: true,
@@ -41,33 +42,10 @@ export async function getClients(): Promise<ClientRow[]> {
 
   return rows.map((r) => ({
     ...r,
+    status: r.status as "ACTIVE" | "INACTIVE",
+    category: "CLIENT" as const, // legacy compat
     recordCount: r._count.records,
   }));
-}
-
-export async function getInternalClients() {
-  return db.client.findMany({
-    where: { category: "INTERNAL" },
-    orderBy: { name: "asc" },
-    include: {
-      records: {
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          title: true,
-          type: true,
-          serviceName: true,
-          url: true,
-          username: true,
-          notes: true,
-          sensitivity: true,
-          isRestricted: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      },
-    },
-  });
 }
 
 export async function getClientName(clientId: string): Promise<string | null> {
@@ -93,7 +71,6 @@ export async function getClientWithRecords(clientId: string) {
           isRestricted: true,
           createdAt: true,
           updatedAt: true,
-          // secretCipher intentionally omitted from the listing query
         },
       },
       auditEvents: {
@@ -105,13 +82,43 @@ export async function getClientWithRecords(clientId: string) {
   });
 }
 
+export async function getInternalClients() {
+  const internal = await db.category.findUnique({
+    where: { slug: "internal" },
+    include: {
+      clients: {
+        orderBy: { name: "asc" },
+        include: {
+          records: {
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              title: true,
+              type: true,
+              serviceName: true,
+              url: true,
+              username: true,
+              notes: true,
+              sensitivity: true,
+              isRestricted: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  return internal?.clients ?? [];
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export type CreateClientInput = {
   name: string;
   contact?: string;
   vertical?: string;
-  category?: "CLIENT" | "INTERNAL";
+  categoryId?: string;
 };
 
 export async function createClient(input: CreateClientInput) {
@@ -120,7 +127,7 @@ export async function createClient(input: CreateClientInput) {
       name: input.name.trim(),
       contact: input.contact?.trim() ?? null,
       vertical: input.vertical?.trim() ?? null,
-      category: (input.category as ClientCategory) ?? ClientCategory.CLIENT,
+      categoryId: input.categoryId ?? null,
     },
   });
   revalidatePath("/");
@@ -132,7 +139,7 @@ export type UpdateClientInput = {
   contact?: string;
   vertical?: string;
   status?: "ACTIVE" | "INACTIVE";
-  category?: "CLIENT" | "INTERNAL";
+  categoryId?: string;
 };
 
 export async function updateClient(clientId: string, input: UpdateClientInput) {
@@ -143,7 +150,7 @@ export async function updateClient(clientId: string, input: UpdateClientInput) {
       ...(input.contact !== undefined && { contact: input.contact.trim() || null }),
       ...(input.vertical !== undefined && { vertical: input.vertical.trim() || null }),
       ...(input.status !== undefined && { status: input.status as ClientStatus }),
-      ...(input.category !== undefined && { category: input.category as ClientCategory }),
+      ...(input.categoryId !== undefined && { categoryId: input.categoryId }),
     },
   });
   revalidatePath("/");

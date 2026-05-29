@@ -16,30 +16,44 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import type { ClientRow } from "@/lib/actions/clients";
+import type { CategoryWithClients } from "@/lib/actions/categories";
 
 type WorkspaceShellProps = {
   children: React.ReactNode;
   clerkEnabled: boolean;
-  clients: ClientRow[];
+  categories: CategoryWithClients[];
 };
 
-const pageMeta: Record<string, { title: string; eyebrow?: string }> = {
+const staticPageMeta: Record<string, { title: string; eyebrow?: string }> = {
   "/": { title: "Client Directory" },
-  "/internal": { title: "Internal", eyebrow: "Internal credentials & records" },
   "/activity": { title: "Activity" },
   "/settings": { title: "Settings", eyebrow: "Preferences and controls" },
 };
 
-export function WorkspaceShell({ children, clerkEnabled, clients }: WorkspaceShellProps) {
+export function WorkspaceShell({ children, clerkEnabled, categories }: WorkspaceShellProps) {
   const pathname = usePathname();
 
-  const activeClientId = pathname.startsWith("/clients/") ? pathname.split("/")[2] : null;
-  const activeClient = activeClientId ? clients.find((c) => c.id === activeClientId) : null;
+  // All clients flattened — used for breadcrumb on /clients/[id]
+  const allClients = categories.flatMap((c) => c.clients);
 
-  const currentPage = pathname.startsWith("/clients/")
-    ? { title: activeClient?.name ?? "Client", eyebrow: undefined }
-    : (pageMeta[pathname] ?? pageMeta["/"]);
+  const activeClientId = pathname.startsWith("/clients/") ? pathname.split("/")[2] : null;
+  const activeClient = activeClientId ? allClients.find((c) => c.id === activeClientId) : null;
+
+  const activeCategoryId = pathname.startsWith("/categories/") ? pathname.split("/")[2] : null;
+  const activeCategory = activeCategoryId
+    ? categories.find((c) => c.id === activeCategoryId)
+    : null;
+
+  let currentPage: { title: string; eyebrow?: string };
+  if (activeClient) {
+    currentPage = { title: activeClient.name };
+  } else if (activeCategory) {
+    currentPage = { title: activeCategory.name };
+  } else {
+    currentPage = staticPageMeta[pathname] ?? staticPageMeta["/"];
+  }
+
+  const showBreadcrumb = Boolean(activeClient);
 
   return (
     <div
@@ -48,7 +62,7 @@ export function WorkspaceShell({ children, clerkEnabled, clients }: WorkspaceShe
     >
       <div className="mx-auto grid h-full max-w-[1820px] gap-4 p-3 sm:p-4 lg:grid-cols-[280px_1fr]">
         <div className="hidden h-full lg:block">
-          <Sidebar pathname={pathname} clients={clients} />
+          <Sidebar pathname={pathname} categories={categories} />
         </div>
 
         <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2rem] border border-border/80 bg-background shadow-[0_30px_100px_-50px_rgba(15,23,42,0.45)]">
@@ -68,7 +82,7 @@ export function WorkspaceShell({ children, clerkEnabled, clients }: WorkspaceShe
                       Workspace navigation
                     </DialogDescription>
                     <DialogBody className="p-3">
-                      <Sidebar pathname={pathname} clients={clients} />
+                      <Sidebar pathname={pathname} categories={categories} />
                     </DialogBody>
                   </DialogContent>
                 </Dialog>
@@ -89,7 +103,7 @@ export function WorkspaceShell({ children, clerkEnabled, clients }: WorkspaceShe
               </div>
 
               <div className="flex flex-col gap-1">
-                {pathname.startsWith("/clients/") ? (
+                {showBreadcrumb ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Link
                       href="/"

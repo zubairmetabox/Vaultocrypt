@@ -110,7 +110,8 @@ function csvToClients(
     const rawStatus = pick(clientRows[0]!, "client_status").toLowerCase();
     result.push({
       name: clientName,
-      category: pick(clientRows[0]!, "entry_category") === "Internal" ? "INTERNAL" : "CLIENT",
+      // categoryId resolved server-side after import; omit for now
+
       contact: pick(clientRows[0]!, "client_contact") || undefined,
       vertical: pick(clientRows[0]!, "client_vertical") || undefined,
       status: rawStatus === "inactive" ? "INACTIVE" : "ACTIVE",
