@@ -114,7 +114,6 @@ export function ClientDetailsCard({
   // ── Move handlers ──────────────────────────────────────────────────────────
 
   function handleMoveOpenChange(nextOpen: boolean) {
-    if (isMovePending) return; // block close while in flight
     setMoveOpen(nextOpen);
     if (nextOpen) setSelectedCategoryId(null);
   }
@@ -122,10 +121,12 @@ export function ClientDetailsCard({
   function handleMove() {
     if (!selectedCategoryId || isMovePending) return;
     const newCatId = selectedCategoryId;
+    // Optimistic: update card label + close dialog immediately
+    setActiveCategoryId(newCatId);
+    setMoveOpen(false);
+    // Fire server action + refresh in background
     startMoveTransition(async () => {
       await updateClient(clientId, { categoryId: newCatId });
-      setActiveCategoryId(newCatId);
-      setMoveOpen(false);
       router.refresh();
     });
   }
@@ -147,9 +148,12 @@ export function ClientDetailsCard({
             {details.vertical && <p>{details.vertical}</p>}
           </div>
           {activeCategory && (
-            <p className="text-xs text-muted-foreground">
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               Category:{" "}
               <span className="font-medium text-foreground">{activeCategory.name}</span>
+              {isMovePending && (
+                <Loader2 className="size-3 animate-spin text-muted-foreground" />
+              )}
             </p>
           )}
         </div>
@@ -217,14 +221,10 @@ export function ClientDetailsCard({
               </DialogBody>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setMoveOpen(false)} disabled={isMovePending}>
+                <Button variant="outline" onClick={() => setMoveOpen(false)}>
                   Cancel
                 </Button>
-                <Button
-                  onClick={handleMove}
-                  disabled={!selectedCategoryId || isMovePending}
-                >
-                  {isMovePending && <Loader2 className="size-4 animate-spin" />}
+                <Button onClick={handleMove} disabled={!selectedCategoryId}>
                   Move client
                 </Button>
               </DialogFooter>
