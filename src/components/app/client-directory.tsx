@@ -43,6 +43,7 @@ import type { CategoryRow } from "@/lib/actions/categories";
 type Props = {
   initialClients: ClientRow[];
   categories: CategoryRow[];
+  defaultCategoryId?: string;
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -61,7 +62,7 @@ function statusLabel(status: "ACTIVE" | "INACTIVE") {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ClientDirectory({ initialClients, categories }: Props) {
+export function ClientDirectory({ initialClients, categories, defaultCategoryId }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -74,13 +75,15 @@ export function ClientDirectory({ initialClients, categories }: Props) {
   const [newName, setNewName] = useState("");
   const [newContact, setNewContact] = useState("");
   const [newVertical, setNewVertical] = useState("");
-  const [newCategoryId, setNewCategoryId] = useState<string>(() => categories[0]?.id ?? "");
+  const [newCategoryId, setNewCategoryId] = useState<string>(
+    () => defaultCategoryId ?? categories[0]?.id ?? "",
+  );
   const addNameRef = useRef<HTMLInputElement>(null);
 
   // Keep default in sync if categories load after first render
   useEffect(() => {
-    setNewCategoryId((prev) => prev || categories[0]?.id || "");
-  }, [categories]);
+    setNewCategoryId((prev) => prev || defaultCategoryId || categories[0]?.id || "");
+  }, [categories, defaultCategoryId]);
 
   const clients = initialClients;
 
