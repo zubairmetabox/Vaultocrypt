@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRightLeft, Building2, Check, Folder, FolderKanban, Loader2, PencilLine } from "lucide-react";
 
@@ -85,6 +85,16 @@ export function ClientDetailsCard({
   const [moveOpen, setMoveOpen] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState(currentCategoryId);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(null);
+
+  // Close modal + commit label only after the full transition (incl. router.refresh) settles
+  useEffect(() => {
+    if (!isMovePending && pendingCategoryId) {
+      setActiveCategoryId(pendingCategoryId);
+      setMoveOpen(false);
+      setPendingCategoryId(null);
+    }
+  }, [isMovePending, pendingCategoryId]);
 
   // ── Edit handlers ──────────────────────────────────────────────────────────
 
@@ -122,11 +132,11 @@ export function ClientDetailsCard({
   function handleMove() {
     if (!selectedCategoryId || isMovePending) return;
     const newCatId = selectedCategoryId;
+    // Record which category we're moving to — useEffect will apply it when transition ends
+    setPendingCategoryId(newCatId);
     startMoveTransition(async () => {
       await updateClient(clientId, { categoryId: newCatId });
-      setActiveCategoryId(newCatId);
-      setMoveOpen(false);
-      router.refresh();
+      router.refresh(); // keeps isPending=true until RSC re-render is committed
     });
   }
 
