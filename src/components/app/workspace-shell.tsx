@@ -39,6 +39,11 @@ export function WorkspaceShell({ children, clerkEnabled, categories }: Workspace
   const activeClientId = pathname.startsWith("/clients/") ? pathname.split("/")[2] : null;
   const activeClient = activeClientId ? allClients.find((c) => c.id === activeClientId) : null;
 
+  // The category that owns the active client (drives the breadcrumb parent link)
+  const activeClientCategory = activeClient
+    ? categories.find((c) => c.clients.some((cl) => cl.id === activeClient.id))
+    : null;
+
   const activeCategoryId = pathname.startsWith("/categories/") ? pathname.split("/")[2] : null;
   const activeCategory = activeCategoryId
     ? categories.find((c) => c.id === activeCategoryId)
@@ -106,10 +111,10 @@ export function WorkspaceShell({ children, clerkEnabled, categories }: Workspace
                 {showBreadcrumb ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Link
-                      href="/"
+                      href={activeClientCategory ? `/categories/${activeClientCategory.id}` : "/"}
                       className="transition-colors duration-200 hover:text-foreground"
                     >
-                      Clients
+                      {activeClientCategory?.name ?? "Clients"}
                     </Link>
                     <span>/</span>
                     <span className="text-foreground">{currentPage.title}</span>
