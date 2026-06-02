@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { GripVertical, Menu, Search } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -66,14 +66,20 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
     setPendingCategoryIds([]);
   }, [categories]);
 
-  const { query, setQuery } = useSearch();
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const { setQuery } = useSearch();
+  const [searchValue, setSearchValue] = useState("");
 
   // Clear search whenever the user navigates to a different page
   useEffect(() => {
+    setSearchValue("");
     setQuery("");
-    if (searchInputRef.current) searchInputRef.current.value = "";
   }, [pathname, setQuery]);
+
+  function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value;
+    setSearchValue(v);
+    setQuery(v);
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -164,10 +170,10 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
                   <div className="flex w-full max-w-xl items-center gap-2 rounded-[1.25rem] border border-border/70 bg-card/70 px-3 py-2 shadow-sm">
                     <Search className="size-4 text-muted-foreground" />
                     <Input
-                      ref={searchInputRef}
+                      value={searchValue}
+                      onChange={handleSearchChange}
                       placeholder="Search projects, records, and notes"
                       className="h-auto border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0"
-                      onChange={(e) => setQuery(e.target.value)}
                     />
                   </div>
                 </div>

@@ -51,6 +51,7 @@ import { useDraggable } from "@dnd-kit/core";
 import { createProject, deleteProjects, moveProjects, type ProjectRow } from "@/lib/actions/projects";
 import { importClients, type ImportClientInput } from "@/lib/actions/import";
 import type { CategoryRow } from "@/lib/actions/categories";
+import { useSearch } from "@/contexts/search";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
@@ -152,6 +153,7 @@ function DraggableProjectCard({
 
 export function ProjectDirectory({ initialProjects, categories, defaultCategoryId }: Props) {
   const router = useRouter();
+  const { query } = useSearch();
 
   const [isPending, startTransition] = useTransition();
   const [isMoving, startMove] = useTransition();
@@ -181,7 +183,12 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
     setNewCategoryId((prev) => prev || defaultCategoryId || categories[0]?.id || "");
   }, [categories, defaultCategoryId]);
 
-  const projects = initialProjects;
+  const isSearching = query.length >= 3;
+  const projects = isSearching
+    ? initialProjects.filter((p) =>
+        p.name.toLowerCase().includes(query.toLowerCase()),
+      )
+    : initialProjects;
 
   const grouped = useMemo(
     () =>
@@ -497,10 +504,19 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
       <CardContent className="space-y-6">
         {projects.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-[1.5rem] border border-dashed border-border/70 py-14 text-center">
-            <p className="text-sm font-medium text-foreground">No projects yet</p>
-            <p className="text-xs text-muted-foreground">
-              Add your first project or import a CSV to get started.
-            </p>
+            {isSearching ? (
+              <>
+                <p className="text-sm font-medium text-foreground">No projects match &ldquo;{query}&rdquo;</p>
+                <p className="text-xs text-muted-foreground">Try a different name.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-foreground">No projects yet</p>
+                <p className="text-xs text-muted-foreground">
+                  Add your first project or import a CSV to get started.
+                </p>
+              </>
+            )}
           </div>
         ) : (
           letters.map((letter) => (
