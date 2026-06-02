@@ -284,7 +284,7 @@ Any new feature must satisfy all of them before it is considered done.
 - [x] **Dialog blocked during save** — `isPending` prevents close (Escape, overlay click) and disables all inputs and action buttons while a save is in flight.
 - [x] **Cancel disabled during save** — prevents partial close and data loss.
 - [x] **Move dialog blocked during move** — `isMoving` prevents `onOpenChange` from closing; dialog transitions to a spinner-only state.
-- [ ] **Error feedback inside dialog** — if a server action throws, show an inline error message rather than silently failing or leaving the dialog in a broken state.
+- [x] **Error feedback inside dialog** — all dialogs catch server action failures and show an inline `AlertCircle` + message above the footer. Optimistic updates are reverted on failure. Record create/edit now hold the dialog open until the server confirms.
 
 ### Optimistic Updates
 
