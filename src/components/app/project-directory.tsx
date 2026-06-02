@@ -45,6 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useDraggable } from "@dnd-kit/core";
 import { createProject, deleteProjects, moveProjects, type ProjectRow } from "@/lib/actions/projects";
 import { importClients, type ImportClientInput } from "@/lib/actions/import";
 import type { CategoryRow } from "@/lib/actions/categories";
@@ -75,6 +76,66 @@ function csvEscape(value: string | number | null) {
 
 function statusLabel(status: "ACTIVE" | "INACTIVE") {
   return status === "ACTIVE" ? "Active" : "Inactive";
+}
+
+// ─── DraggableProjectCard ─────────────────────────────────────────────────────
+
+function DraggableProjectCard({
+  project,
+  selected,
+  onToggle,
+}: {
+  project: ProjectRow;
+  selected: boolean;
+  onToggle: () => void;
+}) {
+  const { setNodeRef, attributes, listeners, transform, isDragging } = useDraggable({
+    id: `dir-project-${project.id}`,
+    data: {
+      type: "project",
+      projectId: project.id,
+      fromCategoryId: project.categoryId,
+      projectName: project.name,
+    },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined}
+      className={cn(
+        "group relative touch-none rounded-[1.1rem] border bg-background/95 shadow-sm transition-all duration-200",
+        isDragging
+          ? "opacity-40"
+          : selected
+            ? "border-ring/60 bg-accent/20 shadow-md"
+            : "border-border/70 hover:border-ring/40 hover:bg-accent/35 hover:shadow-md",
+      )}
+    >
+      <Checkbox
+        checked={selected}
+        onCheckedChange={onToggle}
+        aria-label={selected ? `Deselect ${project.name}` : `Select ${project.name}`}
+        className="absolute top-3 right-3 z-10 size-5 rounded-full"
+      />
+      <Link
+        href={`/projects/${project.id}`}
+        className="flex min-h-20 cursor-grab flex-col justify-between gap-3 px-4 py-3 pr-12 active:cursor-grabbing"
+      >
+        <p className="text-sm font-medium tracking-tight text-foreground">{project.name}</p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">
+            {project.recordCount} record{project.recordCount === 1 ? "" : "s"}
+          </p>
+          <span className="text-xs text-muted-foreground">
+            {project.status === "ACTIVE" ? "Active" : "Inactive"}
+          </span>
+        </div>
+      </Link>
+    </div>
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -410,42 +471,14 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
               </div>
 
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                {grouped[letter].map((project) => {
-                  const selected = selectedIds.includes(project.id);
-                  return (
-                    <div
-                      key={project.id}
-                      className={`group relative rounded-[1.1rem] border bg-background/95 shadow-sm transition-all duration-200 ${
-                        selected
-                          ? "border-ring/60 bg-accent/20 shadow-md"
-                          : "border-border/70 hover:border-ring/40 hover:bg-accent/35 hover:shadow-md"
-                      }`}
-                    >
-                      <Checkbox
-                        checked={selected}
-                        onCheckedChange={() => toggleSelect(project.id)}
-                        aria-label={selected ? `Deselect ${project.name}` : `Select ${project.name}`}
-                        className="absolute top-3 right-3 z-10 size-5 rounded-full"
-                      />
-                      <Link
-                        href={`/projects/${project.id}`}
-                        className="flex min-h-20 flex-col justify-between gap-3 px-4 py-3 pr-12"
-                      >
-                        <p className="text-sm font-medium tracking-tight text-foreground">
-                          {project.name}
-                        </p>
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-xs text-muted-foreground">
-                            {project.recordCount} record{project.recordCount === 1 ? "" : "s"}
-                          </p>
-                          <span className="text-xs text-muted-foreground">
-                            {statusLabel(project.status)}
-                          </span>
-                        </div>
-                      </Link>
-                    </div>
-                  );
-                })}
+                {grouped[letter].map((project) => (
+                  <DraggableProjectCard
+                    key={project.id}
+                    project={project}
+                    selected={selectedIds.includes(project.id)}
+                    onToggle={() => toggleSelect(project.id)}
+                  />
+                ))}
               </div>
             </section>
           ))

@@ -13,6 +13,7 @@ import {
   Plus,
   Settings2,
 } from "lucide-react";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 
 import { BrandMark } from "@/components/app/brand-mark";
 import { Button } from "@/components/ui/button";
@@ -39,9 +40,10 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
 type SidebarProps = {
   pathname: string;
   categories: CategoryWithProjects[];
+  pendingCategoryIds?: string[];
 };
 
-export function Sidebar({ pathname, categories }: SidebarProps) {
+export function Sidebar({ pathname, categories, pendingCategoryIds = [] }: SidebarProps) {
   const router = useRouter();
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>(() => {
@@ -119,6 +121,7 @@ export function Sidebar({ pathname, categories }: SidebarProps) {
               pathname={pathname}
               onToggle={() => toggle(cat.id)}
               isOptimistic={cat.id.startsWith("__optimistic__")}
+              isMovePending={pendingCategoryIds.includes(cat.id)}
             />
           );
         })}
@@ -180,6 +183,7 @@ function CategorySection({
   pathname,
   onToggle,
   isOptimistic,
+  isMovePending,
 }: {
   cat: CategoryWithProjects;
   icon: React.ElementType;
@@ -188,18 +192,27 @@ function CategorySection({
   pathname: string;
   onToggle: () => void;
   isOptimistic?: boolean;
+  isMovePending?: boolean;
 }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `category-drop-${cat.id}`,
+    data: { type: "category", categoryId: cat.id },
+    disabled: isOptimistic,
+  });
+
   const rowClass = cn(
     "group flex w-full cursor-default items-center gap-3 rounded-[1.25rem] px-3 py-3 text-sm font-medium transition-all duration-200",
     isOptimistic
       ? "cursor-default text-muted-foreground opacity-60"
-      : active
-        ? "border border-border/80 bg-accent text-accent-foreground shadow-lg shadow-slate-950/10"
-        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+      : isOver
+        ? "border border-primary/50 bg-primary/10 text-foreground shadow-lg shadow-slate-950/10"
+        : active
+          ? "border border-border/80 bg-accent text-accent-foreground shadow-lg shadow-slate-950/10"
+          : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
   );
 
   return (
-    <div className="space-y-1.5">
+    <div ref={setNodeRef} className="space-y-1.5">
       {/* Entire row toggles the section; icon+text also navigates */}
       <div className={rowClass} onClick={isOptimistic ? undefined : onToggle}>
         {isOptimistic ? (
@@ -216,7 +229,10 @@ function CategorySection({
               onClick={(e) => e.stopPropagation()}
               className="flex min-w-0 shrink items-center gap-3"
             >
-              <Icon className="size-4 shrink-0 transition-transform duration-200 group-hover:scale-105" />
+              {isMovePending
+                ? <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+                : <Icon className="size-4 shrink-0 transition-transform duration-200 group-hover:scale-105" />
+              }
               <span className="truncate">{cat.name}</span>
             </Link>
             {/* Spacer: fills gap between text and chevron, click bubbles → toggle only */}
@@ -253,21 +269,37 @@ function CategorySection({
 
 function ProjectLink({ project, pathname }: { project: ProjectRow; pathname: string }) {
   const active = pathname === `/projects/${project.id}`;
+  const { setNodeRef, attributes, listeners, transform, isDragging } = useDraggable({
+    id: `sidebar-project-${project.id}`,
+    data: {
+      type: "project",
+      projectId: project.id,
+      fromCategoryId: project.categoryId,
+      projectName: project.name,
+    },
+  });
+
   return (
-    <Link
-      href={`/projects/${project.id}`}
-      className={cn(
-        "block rounded-[1rem] px-3 py-2 text-sm transition-all duration-200",
-        active
-          ? "bg-card text-foreground shadow-sm"
-          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-      )}
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined}
+      className={cn("touch-none", isDragging && "opacity-40")}
     >
-      <div className="flex items-center justify-between gap-3">
+      <Link
+        href={`/projects/${project.id}`}
+        className={cn(
+          "flex cursor-grab items-center justify-between gap-3 rounded-[1rem] px-3 py-2 text-sm transition-all duration-200 active:cursor-grabbing",
+          active
+            ? "bg-card text-foreground shadow-sm"
+            : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+        )}
+      >
         <span className="truncate">{project.name}</span>
         <span className="shrink-0 text-xs text-muted-foreground">{project.recordCount}</span>
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 }
 
