@@ -73,7 +73,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         <RecordList projectId={project.id} initialRecords={records} categories={categories} />
       </div>
 
-      <aside className="rounded-[1.75rem] border border-border/70 bg-background/85 p-4 shadow-sm xl:sticky xl:top-6 xl:self-start">
+      <div className="self-start">
+      <aside className="rounded-[1.75rem] border border-border/70 bg-background/85 p-4 shadow-sm xl:sticky xl:top-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold tracking-[0.16em] text-foreground uppercase">
@@ -130,6 +131,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           </div>
         )}
       </aside>
+      </div>
     </div>
   );
 }
