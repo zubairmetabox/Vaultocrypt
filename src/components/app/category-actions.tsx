@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Pencil, Trash2 } from "lucide-react";
+import { AlertCircle, Loader2, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -30,12 +30,15 @@ export function CategoryActions({ categoryId, categoryName, isDefault, projectCo
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState(categoryName);
   const [pendingName, setPendingName] = useState<string | null>(null);
+  const [renameError, setRenameError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (editOpen) {
       setEditName(categoryName);
+      setRenameError(null);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [editOpen, categoryName]);
@@ -51,17 +54,28 @@ export function CategoryActions({ categoryId, categoryName, isDefault, projectCo
   function handleRename() {
     const trimmed = editName.trim();
     if (!trimmed || trimmed === categoryName) { setEditOpen(false); return; }
+    setRenameError(null);
     setPendingName(trimmed);
     startTransition(async () => {
-      await updateCategory(categoryId, trimmed);
-      router.refresh();
+      try {
+        await updateCategory(categoryId, trimmed);
+        router.refresh();
+      } catch {
+        setPendingName(null);
+        setRenameError("Failed to rename category. Please try again.");
+      }
     });
   }
 
   function handleDelete() {
+    setDeleteError(null);
     startTransition(async () => {
-      await deleteCategory(categoryId);
-      router.push("/");
+      try {
+        await deleteCategory(categoryId);
+        router.push("/");
+      } catch {
+        setDeleteError("Failed to delete category. Please try again.");
+      }
     });
   }
 
@@ -108,6 +122,12 @@ export function CategoryActions({ categoryId, categoryName, isDefault, projectCo
               disabled={isPending}
             />
           </div>
+          {renameError && (
+            <div className="mx-6 flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              <AlertCircle className="size-4 shrink-0" />
+              {renameError}
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)} disabled={isPending}>
               Cancel
@@ -140,8 +160,14 @@ export function CategoryActions({ categoryId, categoryName, isDefault, projectCo
               )}
             </DialogDescription>
           </DialogHeader>
+          {deleteError && (
+            <div className="mx-6 flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              <AlertCircle className="size-4 shrink-0" />
+              {deleteError}
+            </div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={isPending}>
+            <Button variant="outline" onClick={() => { setDeleteOpen(false); setDeleteError(null); }} disabled={isPending}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isPending}>

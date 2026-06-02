@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
   Activity,
+  AlertCircle,
   Building2,
   ChevronDown,
   Folder,
@@ -318,11 +319,13 @@ function AddCategoryDialog({
 }) {
   const [name, setName] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       setName("");
+      setError(null);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
@@ -330,12 +333,17 @@ function AddCategoryDialog({
   function handleCreate() {
     if (!name.trim() || isPending) return;
     const trimmed = name.trim();
-    // Optimistic: show immediately, close dialog, sync in background
+    setError(null);
     onOptimisticAdd(trimmed);
     onOpenChange(false);
     startTransition(async () => {
-      await createCategory(trimmed);
-      onRefresh();
+      try {
+        await createCategory(trimmed);
+        onRefresh();
+      } catch {
+        setError("Failed to create category. Please try again.");
+        onOpenChange(true);
+      }
     });
   }
 
@@ -358,6 +366,12 @@ function AddCategoryDialog({
             disabled={isPending}
           />
         </div>
+        {error && (
+          <div className="mx-6 flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            <AlertCircle className="size-4 shrink-0" />
+            {error}
+          </div>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
             Cancel

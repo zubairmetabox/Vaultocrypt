@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
+  AlertCircle,
   ArrowRightLeft,
   Building2,
   Check,
@@ -157,11 +158,14 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [moveOpen, setMoveOpen] = useState(false);
+  const [moveError, setMoveError] = useState<string | null>(null);
   const [selectedMoveCategory, setSelectedMoveCategory] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   // Add project form state
   const [newName, setNewName] = useState("");
@@ -241,21 +245,32 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
 
   function handleMove() {
     if (!selectedMoveCategory || isMoving) return;
+    setMoveError(null);
     setPendingMove(true);
     startMove(async () => {
-      await moveProjects(selectedIds, selectedMoveCategory);
-      router.refresh();
+      try {
+        await moveProjects(selectedIds, selectedMoveCategory);
+        router.refresh();
+      } catch {
+        setPendingMove(false);
+        setMoveError("Failed to move projects. Please try again.");
+      }
     });
   }
 
   // ── Delete ──────────────────────────────────────────────────────────────────
 
   function handleDelete() {
+    setDeleteError(null);
     startTransition(async () => {
-      await deleteProjects(selectedIds);
-      setSelectedIds([]);
-      setDeleteOpen(false);
-      router.refresh();
+      try {
+        await deleteProjects(selectedIds);
+        setSelectedIds([]);
+        setDeleteOpen(false);
+        router.refresh();
+      } catch {
+        setDeleteError("Failed to delete projects. Please try again.");
+      }
     });
   }
 
@@ -270,16 +285,21 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
 
   function handleCreate() {
     if (!newName.trim()) return;
+    setAddError(null);
     startTransition(async () => {
-      await createProject({
-        name: newName,
-        contact: newContact,
-        vertical: newVertical,
-        categoryId: newCategoryId || undefined,
-      });
-      resetAddForm();
-      setAddOpen(false);
-      router.refresh();
+      try {
+        await createProject({
+          name: newName,
+          contact: newContact,
+          vertical: newVertical,
+          categoryId: newCategoryId || undefined,
+        });
+        resetAddForm();
+        setAddOpen(false);
+        router.refresh();
+      } catch {
+        setAddError("Failed to create project. Please try again.");
+      }
     });
   }
 
@@ -350,6 +370,12 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
                           Confirm delete
                         </Button>
                       </DialogFooter>
+                      {deleteError && (
+                        <div className="mx-6 mb-4 flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                          <AlertCircle className="size-4 shrink-0" />
+                          {deleteError}
+                        </div>
+                      )}
                     </DialogContent>
                   </Dialog>
                   <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
@@ -456,6 +482,12 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
                     Create project
                   </Button>
                 </DialogFooter>
+                {addError && (
+                  <div className="mx-6 mb-4 flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                    <AlertCircle className="size-4 shrink-0" />
+                    {addError}
+                  </div>
+                )}
               </DialogContent>
             </Dialog>
           </div>
@@ -550,15 +582,23 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
         </DialogBody>
 
         {!isMoving && (
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMoveOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleMove} disabled={!selectedMoveCategory}>
-              <ArrowRightLeft className="size-4" />
-              Move projects
-            </Button>
-          </DialogFooter>
+          <>
+            {moveError && (
+              <div className="mx-6 flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                <AlertCircle className="size-4 shrink-0" />
+                {moveError}
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setMoveOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleMove} disabled={!selectedMoveCategory}>
+                <ArrowRightLeft className="size-4" />
+                Move projects
+              </Button>
+            </DialogFooter>
+          </>
         )}
       </DialogContent>
     </Dialog>

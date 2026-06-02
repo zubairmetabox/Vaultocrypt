@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { KeyRound, Loader2, StickyNote } from "lucide-react";
 
+import { AlertCircle } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -44,6 +46,8 @@ type RecordFormDialogProps = {
   onSave: (draft: RecordDraft) => void;
   /** Controls save button loading state — managed by the parent transition. */
   isPending?: boolean;
+  /** Inline error message from the parent after a failed server action. */
+  error?: string | null;
 };
 
 const EMPTY_DRAFT: RecordDraft = {
@@ -74,6 +78,7 @@ export function RecordFormDialog({
   record,
   onSave,
   isPending = false,
+  error,
 }: RecordFormDialogProps) {
   const isEdit = Boolean(record);
   const [draft, setDraft] = useState<RecordDraft>(() =>
@@ -220,6 +225,13 @@ export function RecordFormDialog({
 
           </div>
         </DialogBody>
+
+        {error && (
+          <div className="mx-6 flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            <AlertCircle className="size-4 shrink-0" />
+            {error}
+          </div>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>

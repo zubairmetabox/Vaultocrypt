@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRightLeft,
   Building2,
@@ -64,6 +65,7 @@ export function MoveRecordDialog({
   const [selectedCategory, setSelectedCategory] = useState<CategoryWithProjects | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Reset state when dialog opens
   useEffect(() => {
@@ -72,6 +74,7 @@ export function MoveRecordDialog({
       setSelectedCategory(null);
       setSelectedProjectId(null);
       setPendingMove(false);
+      setError(null);
     }
   }, [open]);
 
@@ -91,10 +94,16 @@ export function MoveRecordDialog({
 
   function handleMove() {
     if (!selectedProjectId || isPending) return;
+    setError(null);
     setPendingMove(true);
     startTransition(async () => {
-      await moveRecord(recordId, currentProjectId, selectedProjectId);
-      router.refresh();
+      try {
+        await moveRecord(recordId, currentProjectId, selectedProjectId);
+        router.refresh();
+      } catch {
+        setPendingMove(false);
+        setError("Failed to move record. Please try again.");
+      }
     });
   }
 
@@ -236,10 +245,16 @@ export function MoveRecordDialog({
           )}
         </DialogBody>
 
+        {error && (
+          <div className="mx-6 flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            <AlertCircle className="size-4 shrink-0" />
+            {error}
+          </div>
+        )}
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={() => { setStep("category"); setSelectedProjectId(null); }}
+            onClick={() => { setStep("category"); setSelectedProjectId(null); setError(null); }}
           >
             <ArrowLeft className="size-4" />
             Back

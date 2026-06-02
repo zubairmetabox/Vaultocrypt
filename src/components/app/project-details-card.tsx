@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRightLeft, Building2, Check, Folder, FolderKanban, Loader2, PencilLine } from "lucide-react";
+import { AlertCircle, ArrowRightLeft, Building2, Check, Folder, FolderKanban, Loader2, PencilLine } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,6 +80,8 @@ export function ProjectDetailsCard({
 
   // Edit details state
   const [editOpen, setEditOpen] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
   const [details, setDetails] = useState<ProjectDraft>({
     name: initialName,
     contact: initialContact,
@@ -111,6 +113,7 @@ export function ProjectDetailsCard({
     if (nextOpen) {
       setDraft(details);
       setDraftCategoryId(activeCategoryId ?? "");
+      setEditError(null);
     }
   }
 
@@ -119,37 +122,47 @@ export function ProjectDetailsCard({
   }
 
   function handleSave() {
+    setEditError(null);
     startEditTransition(async () => {
-      await updateProject(projectId, {
-        name: draft.name,
-        contact: draft.contact,
-        vertical: draft.vertical,
-        status: draft.status === "Active" ? "ACTIVE" : "INACTIVE",
-        categoryId: draftCategoryId || undefined,
-      });
-      setDetails(draft);
-      setActiveCategoryId(draftCategoryId || null);
-      setEditOpen(false);
-      router.refresh();
+      try {
+        await updateProject(projectId, {
+          name: draft.name,
+          contact: draft.contact,
+          vertical: draft.vertical,
+          status: draft.status === "Active" ? "ACTIVE" : "INACTIVE",
+          categoryId: draftCategoryId || undefined,
+        });
+        setDetails(draft);
+        setActiveCategoryId(draftCategoryId || null);
+        setEditOpen(false);
+        router.refresh();
+      } catch {
+        setEditError("Failed to save changes. Please try again.");
+      }
     });
   }
 
   // ── Move handlers ──────────────────────────────────────────────────────────
 
   function handleMoveOpenChange(nextOpen: boolean) {
-    if (isMovePending) return; // block Escape/overlay close while in flight
+    if (isMovePending) return;
     setMoveOpen(nextOpen);
-    if (nextOpen) setSelectedCategoryId(null);
+    if (nextOpen) { setSelectedCategoryId(null); setMoveError(null); }
   }
 
   function handleMove() {
     if (!selectedCategoryId || isMovePending) return;
+    setMoveError(null);
     const newCatId = selectedCategoryId;
-    // Record which category we're moving to — useEffect will apply it when transition ends
     setPendingCategoryId(newCatId);
     startMoveTransition(async () => {
-      await updateProject(projectId, { categoryId: newCatId });
-      router.refresh(); // keeps isPending=true until RSC re-render is committed
+      try {
+        await updateProject(projectId, { categoryId: newCatId });
+        router.refresh();
+      } catch {
+        setPendingCategoryId(null);
+        setMoveError("Failed to move project. Please try again.");
+      }
     });
   }
 
@@ -239,6 +252,12 @@ export function ProjectDetailsCard({
                 )}
               </DialogBody>
 
+              {moveError && (
+                <div className="mx-6 flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  <AlertCircle className="size-4 shrink-0" />
+                  {moveError}
+                </div>
+              )}
               <DialogFooter>
                 <Button variant="outline" onClick={() => setMoveOpen(false)} disabled={isMovePending}>
                   Cancel
@@ -331,6 +350,12 @@ export function ProjectDetailsCard({
                 </div>
               </DialogBody>
 
+              {editError && (
+                <div className="mx-6 flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  <AlertCircle className="size-4 shrink-0" />
+                  {editError}
+                </div>
+              )}
               <DialogFooter>
                 <Button variant="outline" onClick={() => setEditOpen(false)}>
                   Cancel

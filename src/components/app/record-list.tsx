@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertCircle,
   ArrowRightLeft,
   Check,
   ClipboardCheck,
@@ -82,6 +83,9 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editRecord, setEditRecord] = useState<RecordItem | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [moveTarget, setMoveTarget] = useState<{ id: string; title: string } | null>(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -134,6 +138,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
   // ── Create ────────────────────────────────────────────────────────────────
 
   function handleSaveNew(draft: RecordDraft) {
+    setCreateError(null);
     const tempId = `optimistic-${Date.now()}`;
     setRecords((prev) => [
       {
@@ -148,20 +153,25 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
       },
       ...prev,
     ]);
-    setCreateOpen(false);
 
     startCreate(async () => {
-      await createRecord({
-        projectId,
-        title: draft.title,
-        type: draft.type === "credential" ? "CREDENTIAL" : "SECURE_NOTE",
-        serviceName: draft.service,
-        url: draft.url,
-        username: draft.username,
-        secretValue: draft.secretValue,
-        notes: draft.notes,
-      });
-      router.refresh();
+      try {
+        await createRecord({
+          projectId,
+          title: draft.title,
+          type: draft.type === "credential" ? "CREDENTIAL" : "SECURE_NOTE",
+          serviceName: draft.service,
+          url: draft.url,
+          username: draft.username,
+          secretValue: draft.secretValue,
+          notes: draft.notes,
+        });
+        setCreateOpen(false);
+        router.refresh();
+      } catch {
+        setRecords((prev) => prev.filter((r) => r.id !== tempId));
+        setCreateError("Failed to create record. Please try again.");
+      }
     });
   }
 
@@ -169,9 +179,11 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
 
   function handleSaveEdit(draft: RecordDraft) {
     if (!editRecord) return;
+    setEditError(null);
+    const snapshot = editRecord;
     setRecords((prev) =>
       prev.map((r) =>
-        r.id === editRecord.id
+        r.id === snapshot.id
           ? {
               ...r,
               title: draft.title,
@@ -185,19 +197,24 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
           : r,
       ),
     );
-    setEditRecord(null);
 
     startEdit(async () => {
-      await updateRecord(editRecord.id, projectId, {
-        title: draft.title,
-        type: draft.type === "credential" ? "CREDENTIAL" : "SECURE_NOTE",
-        serviceName: draft.service,
-        url: draft.url,
-        username: draft.username,
-        secretValue: draft.secretValue || undefined,
-        notes: draft.notes,
-      });
-      router.refresh();
+      try {
+        await updateRecord(snapshot.id, projectId, {
+          title: draft.title,
+          type: draft.type === "credential" ? "CREDENTIAL" : "SECURE_NOTE",
+          serviceName: draft.service,
+          url: draft.url,
+          username: draft.username,
+          secretValue: draft.secretValue || undefined,
+          notes: draft.notes,
+        });
+        setEditRecord(null);
+        router.refresh();
+      } catch {
+        setRecords((prev) => prev.map((r) => (r.id === snapshot.id ? snapshot : r)));
+        setEditError("Failed to save changes. Please try again.");
+      }
     });
   }
 
@@ -205,20 +222,26 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
 
   function handleDelete() {
     if (!deleteTarget) return;
+    setDeleteError(null);
     const targetId = deleteTarget.id;
+    const snapshot = records.find((r) => r.id === targetId);
 
-    // Optimistic — remove from UI immediately
     setRecords((prev) => prev.filter((r) => r.id !== targetId));
     setRevealedSecrets((prev) => {
       const next = new Map(prev);
       next.delete(targetId);
       return next;
     });
-    setDeleteTarget(null);
 
     startDelete(async () => {
-      await deleteRecord(targetId, projectId);
-      router.refresh();
+      try {
+        await deleteRecord(targetId, projectId);
+        setDeleteTarget(null);
+        router.refresh();
+      } catch {
+        if (snapshot) setRecords((prev) => [...prev, snapshot]);
+        setDeleteError("Failed to delete record. Please try again.");
+      }
     });
   }
 
@@ -375,18 +398,20 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
       {/* Create */}
       <RecordFormDialog
         open={createOpen}
-        onOpenChange={(o) => { if (!isCreating) setCreateOpen(o); }}
+        onOpenChange={(o) => { if (!isCreating) { setCreateOpen(o); if (o) setCreateError(null); } }}
         onSave={handleSaveNew}
         isPending={isCreating}
+        error={createError}
       />
 
       {/* Edit */}
       <RecordFormDialog
         open={Boolean(editRecord)}
-        onOpenChange={(o) => { if (!o && !isEditing) setEditRecord(null); }}
+        onOpenChange={(o) => { if (!o && !isEditing) { setEditRecord(null); setEditError(null); } }}
         record={editRecord ?? undefined}
         onSave={handleSaveEdit}
         isPending={isEditing}
+        error={editError}
       />
 
       {/* Delete confirmation */}
@@ -403,8 +428,14 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
               project. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
+          {deleteError && (
+            <div className="mx-6 flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              <AlertCircle className="size-4 shrink-0" />
+              {deleteError}
+            </div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
+            <Button variant="outline" onClick={() => { setDeleteTarget(null); setDeleteError(null); }} disabled={isDeleting}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
