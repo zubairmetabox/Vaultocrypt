@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { GripVertical, Menu, Search } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { moveProjects } from "@/lib/actions/projects";
+import { SearchProvider, useSearch } from "@/contexts/search";
 import type { CategoryWithProjects } from "@/lib/actions/categories";
 
 type WorkspaceShellProps = {
@@ -44,6 +45,16 @@ const staticPageMeta: Record<string, { title: string; eyebrow?: string }> = {
 };
 
 export function WorkspaceShell({ children, clerkEnabled, categories }: WorkspaceShellProps) {
+  return (
+    <SearchProvider>
+      <WorkspaceShellInner clerkEnabled={clerkEnabled} categories={categories}>
+        {children}
+      </WorkspaceShellInner>
+    </SearchProvider>
+  );
+}
+
+function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -54,6 +65,15 @@ export function WorkspaceShell({ children, clerkEnabled, categories }: Workspace
   useEffect(() => {
     setPendingCategoryIds([]);
   }, [categories]);
+
+  const { query, setQuery } = useSearch();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Clear search whenever the user navigates to a different page
+  useEffect(() => {
+    setQuery("");
+    if (searchInputRef.current) searchInputRef.current.value = "";
+  }, [pathname, setQuery]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -144,8 +164,10 @@ export function WorkspaceShell({ children, clerkEnabled, categories }: Workspace
                   <div className="flex w-full max-w-xl items-center gap-2 rounded-[1.25rem] border border-border/70 bg-card/70 px-3 py-2 shadow-sm">
                     <Search className="size-4 text-muted-foreground" />
                     <Input
+                      ref={searchInputRef}
                       placeholder="Search projects, records, and notes"
                       className="h-auto border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0"
+                      onChange={(e) => setQuery(e.target.value)}
                     />
                   </div>
                 </div>

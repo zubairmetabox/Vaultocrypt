@@ -40,6 +40,7 @@ import {
 } from "@/lib/actions/records";
 import type { CategoryWithProjects } from "@/lib/actions/categories";
 import type { RecordDraft, RecordFormInput } from "@/components/app/record-form-dialog";
+import { useSearch } from "@/contexts/search";
 
 export type RecordItem = RecordFormInput & {
   id: string;
@@ -67,6 +68,7 @@ function formatDate(date: Date): string {
 }
 
 export function RecordList({ projectId, initialRecords, categories }: RecordListProps) {
+  const { query } = useSearch();
   const router = useRouter();
   const [isCreating, startCreate] = useTransition();
   const [isEditing, startEdit] = useTransition();
@@ -245,6 +247,17 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
     });
   }
 
+  const isSearching = query.length >= 3;
+  const displayRecords = isSearching
+    ? records.filter((r) => {
+        const q = query.toLowerCase();
+        return (
+          r.title.toLowerCase().includes(q) ||
+          (r.serviceName?.toLowerCase().includes(q) ?? false)
+        );
+      })
+    : records;
+
   return (
     <>
       <Card className="border-border/70 bg-card/95">
@@ -273,8 +286,13 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                 Add record
               </Button>
             </div>
+          ) : isSearching && displayRecords.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-[1.5rem] border border-dashed border-border/70 py-10 text-center">
+              <p className="text-sm font-medium text-foreground">No records match &ldquo;{query}&rdquo;</p>
+              <p className="text-xs text-muted-foreground">Try a different title or service name.</p>
+            </div>
           ) : (
-            records.map((record) => {
+            displayRecords.map((record) => {
               const secret = revealedSecrets.get(record.id);
               const isRevealed = secret !== undefined;
               const isRevealing = revealingId === record.id;
