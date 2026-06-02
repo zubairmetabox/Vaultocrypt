@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ClientStatus } from "@prisma/client";
+import { AuditAction, ClientStatus } from "@prisma/client";
 
+import { writeAudit } from "@/lib/audit";
 import { prisma as db } from "@/lib/db";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -128,6 +129,13 @@ export async function createProject(input: CreateProjectInput) {
       categoryId: input.categoryId ?? null,
     },
   });
+  await writeAudit({
+    action: AuditAction.CLIENT_CREATED,
+    resource: "project",
+    resourceId: project.id,
+    projectId: project.id,
+    metadata: { name: project.name },
+  });
   revalidatePath("/");
   return project;
 }
@@ -151,12 +159,24 @@ export async function updateProject(projectId: string, input: UpdateProjectInput
       ...(input.categoryId !== undefined && { categoryId: input.categoryId }),
     },
   });
+  await writeAudit({
+    action: AuditAction.CLIENT_UPDATED,
+    resource: "project",
+    resourceId: projectId,
+    projectId,
+    metadata: { updatedFields: Object.keys(input) },
+  });
   revalidatePath("/");
   revalidatePath(`/projects/${projectId}`);
   return project;
 }
 
 export async function deleteProjects(projectIds: string[]) {
+  await Promise.all(
+    projectIds.map((id) =>
+      writeAudit({ action: AuditAction.CLIENT_DELETED, resource: "project", resourceId: id }),
+    ),
+  );
   await db.project.deleteMany({ where: { id: { in: projectIds } } });
   revalidatePath("/");
 }
@@ -166,5 +186,16 @@ export async function moveProjects(projectIds: string[], categoryId: string) {
     where: { id: { in: projectIds } },
     data: { categoryId },
   });
+  await Promise.all(
+    projectIds.map((id) =>
+      writeAudit({
+        action: AuditAction.CLIENT_UPDATED,
+        resource: "project",
+        resourceId: id,
+        projectId: id,
+        metadata: { movedToCategoryId: categoryId },
+      }),
+    ),
+  );
   revalidatePath("/", "layout");
 }

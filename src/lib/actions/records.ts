@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { RecordSensitivity, RecordType } from "@prisma/client";
+import { AuditAction, RecordSensitivity, RecordType } from "@prisma/client";
 
+import { writeAudit } from "@/lib/audit";
 import { decrypt, encrypt } from "@/lib/crypto";
 import { prisma as db } from "@/lib/db";
 
@@ -54,9 +55,31 @@ export async function getRecords(projectId: string): Promise<RecordRow[]> {
 export async function revealSecret(recordId: string): Promise<string> {
   const record = await db.record.findUniqueOrThrow({
     where: { id: recordId },
-    select: { secretCipher: true },
+    select: { secretCipher: true, projectId: true },
   });
+  await writeAudit({
+    action: AuditAction.SECRET_REVEALED,
+    resource: "record",
+    resourceId: recordId,
+    projectId: record.projectId,
+    recordId,
+  });
+  return record.secretCipher ? decrypt(record.secretCipher) : "";
+}
 
+/** Privileged action — logs SECRET_COPIED then returns the decrypted value for clipboard use. */
+export async function copySecret(recordId: string): Promise<string> {
+  const record = await db.record.findUniqueOrThrow({
+    where: { id: recordId },
+    select: { secretCipher: true, projectId: true },
+  });
+  await writeAudit({
+    action: AuditAction.SECRET_COPIED,
+    resource: "record",
+    resourceId: recordId,
+    projectId: record.projectId,
+    recordId,
+  });
   return record.secretCipher ? decrypt(record.secretCipher) : "";
 }
 
@@ -87,6 +110,14 @@ export async function createRecord(input: CreateRecordInput) {
       notes: input.notes?.trim() || null,
       sensitivity: (input.sensitivity as RecordSensitivity) ?? RecordSensitivity.SENSITIVE,
     },
+  });
+  await writeAudit({
+    action: AuditAction.RECORD_CREATED,
+    resource: "record",
+    resourceId: record.id,
+    projectId: input.projectId,
+    recordId: record.id,
+    metadata: { title: record.title, type: record.type },
   });
   revalidatePath(`/projects/${input.projectId}`);
   return record;
@@ -119,17 +150,40 @@ export async function updateRecord(recordId: string, projectId: string, input: U
       ...(input.sensitivity !== undefined && { sensitivity: input.sensitivity as RecordSensitivity }),
     },
   });
+  await writeAudit({
+    action: AuditAction.RECORD_UPDATED,
+    resource: "record",
+    resourceId: recordId,
+    projectId,
+    recordId,
+    metadata: { updatedFields: Object.keys(input) },
+  });
   revalidatePath(`/projects/${projectId}`);
   return record;
 }
 
 export async function deleteRecord(recordId: string, projectId: string) {
+  await writeAudit({
+    action: AuditAction.RECORD_DELETED,
+    resource: "record",
+    resourceId: recordId,
+    projectId,
+    recordId,
+  });
   await db.record.delete({ where: { id: recordId } });
   revalidatePath(`/projects/${projectId}`);
 }
 
 export async function moveRecord(recordId: string, fromProjectId: string, toProjectId: string) {
   await db.record.update({ where: { id: recordId }, data: { projectId: toProjectId } });
+  await writeAudit({
+    action: AuditAction.RECORD_UPDATED,
+    resource: "record",
+    resourceId: recordId,
+    projectId: fromProjectId,
+    recordId,
+    metadata: { movedToProjectId: toProjectId },
+  });
   revalidatePath(`/projects/${fromProjectId}`);
   revalidatePath(`/projects/${toProjectId}`);
 }

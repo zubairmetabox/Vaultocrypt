@@ -31,6 +31,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  copySecret,
   createRecord,
   deleteRecord,
   revealSecret,
@@ -92,11 +93,8 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
   // ── Copy ──────────────────────────────────────────────────────────────────
 
   const handleCopy = useCallback(async (record: VaultRecord) => {
-    let value = revealedSecrets.get(record.id);
-    if (!value) {
-      // Fetch secret silently without showing it
-      value = await revealSecret(record.id);
-    }
+    // Always call copySecret so the audit event is written even if already revealed
+    const value = await copySecret(record.id);
     if (!value) return;
 
     try {

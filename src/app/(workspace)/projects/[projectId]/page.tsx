@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { AlertTriangle, ShieldCheck } from "lucide-react";
 
+import { AuditActorInfo } from "@/components/app/audit-actor-info";
 import { ProjectDetailsCard } from "@/components/app/project-details-card";
 import { RecordList } from "@/components/app/record-list";
 import { Badge } from "@/components/ui/badge";
@@ -103,31 +104,29 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           <p className="mt-4 text-sm text-muted-foreground">No audit events yet.</p>
         ) : (
           <div className="mt-4 space-y-3">
-            {project.auditEvents.map((event) => {
-              const actorName = event.actor
-                ? [event.actor.firstName, event.actor.lastName].filter(Boolean).join(" ") ||
-                  event.actor.email
-                : "System";
-              return (
-                <div
-                  key={event.id}
-                  className="rounded-[1.4rem] border border-border/70 bg-card/70 p-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{actorName}</p>
-                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                        {event.action.replace(/_/g, " ").toLowerCase()} · {event.resource}
-                      </p>
-                    </div>
-                    <Badge variant="outline">{event.action}</Badge>
+            {project.auditEvents.map((event) => (
+              <div
+                key={event.id}
+                className="rounded-[1.4rem] border border-border/70 bg-card/70 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <AuditActorInfo
+                      firstName={event.actor?.firstName}
+                      lastName={event.actor?.lastName}
+                      email={event.actor?.email}
+                    />
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      {event.action.replace(/_/g, " ").toLowerCase()} · {event.resource}
+                    </p>
                   </div>
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    {formatUpdated(event.createdAt)}
-                  </p>
+                  <Badge variant="outline" className="shrink-0">{event.action}</Badge>
                 </div>
-              );
-            })}
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {formatUpdated(event.createdAt)}
+                </p>
+              </div>
+            ))}
           </div>
         )}
       </aside>
