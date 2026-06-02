@@ -14,6 +14,9 @@ Current state note:
 - Move is live: bulk move projects between categories (button + drag-and-drop), move records between projects
 - Drag-and-drop is live: projects draggable via grip handle in directory, sidebar projects draggable; sidebar category rows are drop zones
 - Category rename and delete available on each category page (header actions)
+- Category can also be changed from the Edit project details dialog
+- Audit event capture is live: all mutations write to AuditEvent; User rows auto-upserted from Clerk on first action
+- Activity page shows real audit events with actor name, click-to-reveal email, and exact GMT+4 timestamps
 - Migration-grade export and advanced import mapping are still outstanding
 
 ## Product Rules
@@ -181,8 +184,8 @@ Current state note:
 ### Tasks
 
 - [x] Build the activity view for audit history
-- [ ] Capture required events:
-  login, failed login, create, update, delete, reveal, copy, role change, restriction change
+- [x] Capture required events: create, update, delete (projects + records), reveal secret, copy secret
+- [ ] Capture remaining events: login, failed login, role change, restriction change
 - [x] Build settings surface for theme and future role controls
 - [ ] Add restriction management for sensitive projects or records
 - [x] Show record freshness details such as last updated by and when
@@ -190,7 +193,7 @@ Current state note:
 
 ### Deliverables
 
-- [x] Visible audit trail
+- [x] Visible audit trail with real events, actor names, click-to-reveal email, GMT+4 timestamps
 - [x] Basic settings controls
 - [ ] Restriction support for exceptions
 - [x] Polished dashboard scrolling and balanced settings layout
@@ -295,7 +298,7 @@ Any new feature must satisfy all of them before it is considered done.
 - [x] Project directory — empty state with CTA to add first project.
 - [x] Record list — empty state with CTA to add first record.
 - [x] Category sidebar section — "No projects yet" when a category has no projects.
-- [ ] Activity page — empty state when no audit events exist yet.
+- [x] Activity page — empty state when no audit events exist yet.
 - [ ] Search results — empty state when no matches found.
 
 ### Feedback Patterns
@@ -371,10 +374,10 @@ These actions must be treated as privileged and audited:
 
 - [x] Reveal secret
 - [x] Copy secret
+- [x] Delete project (logged before delete)
+- [x] Delete record (logged before delete)
 - [ ] Change role
 - [ ] Change restriction
-- [ ] Delete project
-- [ ] Delete record
 
 ## Manual Verification Focus
 
@@ -384,7 +387,7 @@ These actions must be treated as privileged and audited:
 - [ ] Secret values are hidden by default
 - [ ] Reveal and copy actions feel deliberate and safe
 - [ ] Role restrictions affect what actions are available
-- [ ] Audit activity is visible for sensitive events
+- [x] Audit activity is visible for sensitive events
 - [x] Dashboard shell uses internal scrolling without browser-page overflow
 - [ ] Import preview reflects user-defined mappings accurately
 - [x] CSV upload preview shows headers and sample rows safely, including multiline notes
@@ -415,7 +418,7 @@ These actions must be treated as privileged and audited:
 - Server actions:
   - `src/lib/actions/projects.ts` — `getProjects`, `getProjectName`, `getProjectWithRecords`, `getInternalProjects`, `createProject`, `updateProject`, `deleteProjects`, `moveProjects`
   - `src/lib/actions/categories.ts` — `getCategories`, `getProjectsByCategory`, `createCategory`, `updateCategory`, `deleteCategory`
-  - `src/lib/actions/records.ts` — `getRecords`, `revealSecret`, `createRecord`, `updateRecord`, `deleteRecord`, `moveRecord`
+  - `src/lib/actions/records.ts` — `getRecords`, `revealSecret`, `copySecret`, `createRecord`, `updateRecord`, `deleteRecord`, `moveRecord`
   - `src/lib/actions/import.ts` — `importClients`
 - `revealSecret` is the only place decryption happens — server-only, never exposed to the client bundle.
 - `VaultRecord` type from `src/lib/mock-data.ts` is still used as a shape bridge in the project detail page to pass records into `RecordList`. The actual data comes from the DB. This type reference should be cleaned up when `RecordList` is refactored to accept `RecordRow` directly.
@@ -424,3 +427,6 @@ These actions must be treated as privileged and audited:
 - Routes: `/` (project directory), `/categories/[categoryId]`, `/projects/[projectId]`, `/activity`, `/settings`, `/sign-in`, `/sign-up`.
 - **Drag-and-drop**: `@dnd-kit/core` with `DndContext` in `WorkspaceShell`. `onDragEnd` calls `moveProjects`. Sidebar category rows use `useDroppable`; directory cards and sidebar project links use `useDraggable`. Sidebar move spinners clear via `useEffect` on the `categories` prop, not on server action return.
 - **Category actions**: `src/components/app/category-actions.tsx` — rendered in `WorkspaceShell` header when `activeCategory` is set. Rename modal closes only when `categoryName` prop reflects the new value (same prop-watching pattern as sidebar move spinners).
+- **Audit**: `src/lib/audit.ts` — `writeAudit` helper; calls Clerk `currentUser()` and upserts the `User` row so actor is always resolved. All project and record mutations call `writeAudit`. Copy uses `copySecret` server action (not `revealSecret`) so the event is always captured.
+- **Audit UI**: `src/components/app/audit-actor-info.tsx` — shows actor name with a click-to-reveal email button. Used in both the project audit trail sidebar and the activity page. Timestamps are formatted in `Indian/Mauritius` (GMT+4) with no suffix.
+- **Edit project details**: category dropdown added to the edit dialog (`project-details-card.tsx`). Saves `categoryId` via `updateProject` alongside other fields.

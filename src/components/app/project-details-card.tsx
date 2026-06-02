@@ -19,6 +19,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { CategoryRow } from "@/lib/actions/categories";
 import { updateProject } from "@/lib/actions/projects";
 import { cn } from "@/lib/utils";
@@ -80,6 +87,7 @@ export function ProjectDetailsCard({
     status: initialStatus,
   });
   const [draft, setDraft] = useState<ProjectDraft>(details);
+  const [draftCategoryId, setDraftCategoryId] = useState<string>(currentCategoryId ?? "");
 
   // Move category state
   const [moveOpen, setMoveOpen] = useState(false);
@@ -100,7 +108,10 @@ export function ProjectDetailsCard({
 
   function handleEditOpenChange(nextOpen: boolean) {
     setEditOpen(nextOpen);
-    if (nextOpen) setDraft(details);
+    if (nextOpen) {
+      setDraft(details);
+      setDraftCategoryId(activeCategoryId ?? "");
+    }
   }
 
   function updateDraft<K extends keyof ProjectDraft>(key: K, value: ProjectDraft[K]) {
@@ -114,8 +125,10 @@ export function ProjectDetailsCard({
         contact: draft.contact,
         vertical: draft.vertical,
         status: draft.status === "Active" ? "ACTIVE" : "INACTIVE",
+        categoryId: draftCategoryId || undefined,
       });
       setDetails(draft);
+      setActiveCategoryId(draftCategoryId || null);
       setEditOpen(false);
       router.refresh();
     });
@@ -281,20 +294,38 @@ export function ProjectDetailsCard({
                     </div>
                   </div>
 
-                  <div className="grid gap-2">
-                    <Label>Status</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {statuses.map((status) => (
-                        <Button
-                          key={status}
-                          type="button"
-                          size="sm"
-                          variant={draft.status === status ? "default" : "outline"}
-                          onClick={() => updateDraft("status", status)}
-                        >
-                          {status}
-                        </Button>
-                      ))}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label>Status</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {statuses.map((status) => (
+                          <Button
+                            key={status}
+                            type="button"
+                            size="sm"
+                            variant={draft.status === status ? "default" : "outline"}
+                            onClick={() => updateDraft("status", status)}
+                          >
+                            {status}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label>Category</Label>
+                      <Select value={draftCategoryId} onValueChange={setDraftCategoryId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>
