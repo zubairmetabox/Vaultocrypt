@@ -11,6 +11,7 @@ import {
   FileUp,
   Folder,
   FolderKanban,
+  GripVertical,
   Loader2,
   Plus,
   Trash2,
@@ -102,11 +103,9 @@ function DraggableProjectCard({
   return (
     <div
       ref={setNodeRef}
-      {...listeners}
-      {...attributes}
       style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined}
       className={cn(
-        "group relative touch-none rounded-[1.1rem] border bg-background/95 shadow-sm transition-all duration-200",
+        "group relative rounded-[1.1rem] border bg-background/95 shadow-sm transition-all duration-200",
         isDragging
           ? "opacity-40"
           : selected
@@ -114,6 +113,16 @@ function DraggableProjectCard({
             : "border-border/70 hover:border-ring/40 hover:bg-accent/35 hover:shadow-md",
       )}
     >
+      {/* Drag handle — only this triggers drag */}
+      <button
+        {...listeners}
+        {...attributes}
+        aria-label="Drag to move"
+        className="absolute top-3 left-3 z-10 flex size-5 touch-none cursor-grab items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity group-hover:opacity-60 hover:opacity-100! active:cursor-grabbing"
+      >
+        <GripVertical className="size-4" />
+      </button>
+
       <Checkbox
         checked={selected}
         onCheckedChange={onToggle}
@@ -122,7 +131,7 @@ function DraggableProjectCard({
       />
       <Link
         href={`/projects/${project.id}`}
-        className="flex min-h-20 cursor-grab flex-col justify-between gap-3 px-4 py-3 pr-12 active:cursor-grabbing"
+        className="flex min-h-20 flex-col justify-between gap-3 py-3 pr-12 pl-10"
       >
         <p className="text-sm font-medium tracking-tight text-foreground">{project.name}</p>
         <div className="flex items-center justify-between gap-3">
