@@ -11,7 +11,9 @@ Current state note:
 - `VaultRecord` shape from `src/lib/mock-data.ts` is still referenced as a type bridge in the project detail page — not for actual data
 - Import is wired end-to-end: CSV → dialog → `importClients` server action → DB
 - Category system is live: dynamic categories replace the old hardcoded Clients/Internal split
-- Move is live: bulk move projects between categories, move records between projects
+- Move is live: bulk move projects between categories (button + drag-and-drop), move records between projects
+- Drag-and-drop is live: projects draggable via grip handle in directory, sidebar projects draggable; sidebar category rows are drop zones
+- Category rename and delete available on each category page (header actions)
 - Migration-grade export and advanced import mapping are still outstanding
 
 ## Product Rules
@@ -43,6 +45,7 @@ Current state note:
 - [x] Project detail header fields currently shown: name, primary contact, vertical, status, category
 - [x] Record presentation: table/list hybrid
 - [x] Primary record actions: `Reveal`, `Copy`, `Edit`, `Move`
+- [x] Drag-and-drop project organisation via grip handle (directory) and full row (sidebar)
 - [x] Create/edit flows: modal dialogs
 - [x] Search: prominent secondary tool
 - [x] Motion: more expressive than average SaaS, but still purposeful
@@ -139,6 +142,9 @@ Current state note:
 - [x] Category picker on project create and project edit
 - [x] Category pages at `/categories/[categoryId]` rendering filtered project directory
 - [x] Sidebar shows all categories dynamically; clicking category name navigates to its page
+- [x] Category rename and delete from the category page header (Rename always available; Delete hidden for default categories)
+- [x] Drag-and-drop to move projects between categories — grip handle on directory cards, full row drag on sidebar project links; sidebar category rows are drop zones
+- [x] Sidebar category icons show spinner during a drag-move; cleared only once refreshed data arrives
 
 ### Deliverables
 
@@ -147,6 +153,8 @@ Current state note:
 - [x] Project creation and editing flows (real DB)
 - [x] Project detail audit sidebar with aligned dashboard layout
 - [x] Selectable project directory with bulk export, move, and delete actions
+- [x] Drag-and-drop project organisation (grip handle on cards; sidebar rows as drop zones)
+- [x] Category rename and delete on category pages
 
 ## Phase 6: Record Management
 
@@ -381,7 +389,8 @@ These actions must be treated as privileged and audited:
 - [ ] Import preview reflects user-defined mappings accurately
 - [x] CSV upload preview shows headers and sample rows safely, including multiline notes
 - [ ] Vaultocrypt export can be compared reliably against Zoho source export
-- [ ] Move project correctly reassigns category and updates sidebar
+- [x] Move project correctly reassigns category and updates sidebar
+- [x] Drag-and-drop move feels correct — spinner on affected categories, clears only on UI update
 - [ ] Move record correctly transfers to target project and disappears from source
 
 ## Current Build Order
@@ -413,3 +422,5 @@ These actions must be treated as privileged and audited:
 - CSV parsing helpers live in `src/lib/imports/csv.ts` and canonical import field types live in `src/lib/imports/types.ts`.
 - Existing CSV export is only a small project-directory bulk export (project metadata only, no records), not a record-level migration export.
 - Routes: `/` (project directory), `/categories/[categoryId]`, `/projects/[projectId]`, `/activity`, `/settings`, `/sign-in`, `/sign-up`.
+- **Drag-and-drop**: `@dnd-kit/core` with `DndContext` in `WorkspaceShell`. `onDragEnd` calls `moveProjects`. Sidebar category rows use `useDroppable`; directory cards and sidebar project links use `useDraggable`. Sidebar move spinners clear via `useEffect` on the `categories` prop, not on server action return.
+- **Category actions**: `src/components/app/category-actions.tsx` — rendered in `WorkspaceShell` header when `activeCategory` is set. Rename modal closes only when `categoryName` prop reflects the new value (same prop-watching pattern as sidebar move spinners).
