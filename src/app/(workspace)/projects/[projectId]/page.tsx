@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { getCategories } from "@/lib/actions/categories";
 import { getProjectWithRecords } from "@/lib/actions/projects";
-import type { VaultRecord } from "@/lib/mock-data";
 
 type ProjectPageProps = {
   params: Promise<{ projectId: string }>;
@@ -43,17 +42,15 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
   if (!project) notFound();
 
-  // Map DB records → VaultRecord shape expected by RecordList
-  const records: VaultRecord[] = project.records.map((r) => ({
+  const records = project.records.map((r) => ({
     id: r.id,
     title: r.title,
-    type: r.type === "CREDENTIAL" ? "credential" : "secure_note",
-    service: r.serviceName ?? "",
-    url: r.url ?? "",
-    username: r.username ?? "",
-    secretValue: "", // never sent in listing — revealed via server action on demand
-    notes: r.notes ?? "",
-    lastUpdated: formatUpdated(r.updatedAt),
+    type: (r.type === "CREDENTIAL" ? "credential" : "secure_note") as "credential" | "secure_note",
+    serviceName: r.serviceName,
+    url: r.url,
+    username: r.username,
+    notes: r.notes,
+    updatedAt: r.updatedAt,
   }));
 
   const elevatedEvents = project.auditEvents.filter(

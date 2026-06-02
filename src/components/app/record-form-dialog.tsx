@@ -17,9 +17,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { VaultRecord } from "@/lib/mock-data";
+export type RecordFormInput = {
+  title: string;
+  type: "credential" | "secure_note";
+  serviceName: string | null;
+  url: string | null;
+  username: string | null;
+  notes: string | null;
+};
 
-type RecordDraft = {
+export type RecordDraft = {
   title: string;
   type: "credential" | "secure_note";
   service: string;
@@ -33,8 +40,8 @@ type RecordFormDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Pass a record to edit it; omit for create mode. */
-  record?: VaultRecord;
-  onSave: (draft: Omit<VaultRecord, "id" | "lastUpdated">) => void;
+  record?: RecordFormInput;
+  onSave: (draft: RecordDraft) => void;
   /** Controls save button loading state — managed by the parent transition. */
   isPending?: boolean;
 };
@@ -49,15 +56,15 @@ const EMPTY_DRAFT: RecordDraft = {
   notes: "",
 };
 
-function toDraft(record: VaultRecord): RecordDraft {
+function toDraft(record: RecordFormInput): RecordDraft {
   return {
     title: record.title,
     type: record.type,
-    service: record.service,
-    url: record.url,
-    username: record.username,
-    secretValue: record.secretValue,
-    notes: record.notes,
+    service: record.serviceName ?? "",
+    url: record.url ?? "",
+    username: record.username ?? "",
+    secretValue: "",
+    notes: record.notes ?? "",
   };
 }
 

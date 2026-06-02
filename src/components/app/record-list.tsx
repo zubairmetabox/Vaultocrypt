@@ -38,15 +38,32 @@ import {
   updateRecord,
 } from "@/lib/actions/records";
 import type { CategoryWithProjects } from "@/lib/actions/categories";
-import type { VaultRecord } from "@/lib/mock-data";
+import type { RecordDraft, RecordFormInput } from "@/components/app/record-form-dialog";
+
+export type RecordItem = RecordFormInput & {
+  id: string;
+  updatedAt: Date;
+};
 
 type RecordListProps = {
   projectId: string;
-  initialRecords: VaultRecord[];
+  initialRecords: RecordItem[];
   categories?: CategoryWithProjects[];
 };
 
 type DeleteTarget = { id: string; title: string } | null;
+
+function formatDate(date: Date): string {
+  return date.toLocaleString("en-GB", {
+    timeZone: "Indian/Mauritius",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
 
 export function RecordList({ projectId, initialRecords, categories }: RecordListProps) {
   const router = useRouter();
@@ -55,7 +72,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
   const [isDeleting, startDelete] = useTransition();
 
   // Keep local copy in sync when server refreshes props
-  const [records, setRecords] = useState<VaultRecord[]>(initialRecords);
+  const [records, setRecords] = useState<RecordItem[]>(initialRecords);
   useEffect(() => { setRecords(initialRecords); }, [initialRecords]);
 
   // Revealed secrets stored client-side only (never in the initial render)
@@ -63,7 +80,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
   const [revealingId, setRevealingId] = useState<string | null>(null);
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [editRecord, setEditRecord] = useState<VaultRecord | null>(null);
+  const [editRecord, setEditRecord] = useState<RecordItem | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [moveTarget, setMoveTarget] = useState<{ id: string; title: string } | null>(null);
@@ -71,7 +88,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
 
   // ── Reveal ────────────────────────────────────────────────────────────────
 
-  async function handleReveal(record: VaultRecord) {
+  async function handleReveal(record: RecordItem) {
     if (revealedSecrets.has(record.id)) {
       // Hide
       setRevealedSecrets((prev) => {
@@ -92,7 +109,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
 
   // ── Copy ──────────────────────────────────────────────────────────────────
 
-  const handleCopy = useCallback(async (record: VaultRecord) => {
+  const handleCopy = useCallback(async (record: RecordItem) => {
     // Always call copySecret so the audit event is written even if already revealed
     const value = await copySecret(record.id);
     if (!value) return;
@@ -116,11 +133,19 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
 
   // ── Create ────────────────────────────────────────────────────────────────
 
-  function handleSaveNew(draft: Omit<VaultRecord, "id" | "lastUpdated">) {
-    // Optimistic — add to top of list immediately, close dialog
+  function handleSaveNew(draft: RecordDraft) {
     const tempId = `optimistic-${Date.now()}`;
     setRecords((prev) => [
-      { ...draft, id: tempId, lastUpdated: "Just now" },
+      {
+        id: tempId,
+        title: draft.title,
+        type: draft.type,
+        serviceName: draft.service || null,
+        url: draft.url || null,
+        username: draft.username || null,
+        notes: draft.notes || null,
+        updatedAt: new Date(),
+      },
       ...prev,
     ]);
     setCreateOpen(false);
@@ -136,18 +161,28 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
         secretValue: draft.secretValue,
         notes: draft.notes,
       });
-      router.refresh(); // swaps temp record with real one from DB
+      router.refresh();
     });
   }
 
   // ── Edit ──────────────────────────────────────────────────────────────────
 
-  function handleSaveEdit(draft: Omit<VaultRecord, "id" | "lastUpdated">) {
+  function handleSaveEdit(draft: RecordDraft) {
     if (!editRecord) return;
-    // Optimistic — reflect changes immediately, close dialog
     setRecords((prev) =>
       prev.map((r) =>
-        r.id === editRecord.id ? { ...r, ...draft, lastUpdated: "Just now" } : r,
+        r.id === editRecord.id
+          ? {
+              ...r,
+              title: draft.title,
+              type: draft.type,
+              serviceName: draft.service || null,
+              url: draft.url || null,
+              username: draft.username || null,
+              notes: draft.notes || null,
+              updatedAt: new Date(),
+            }
+          : r,
       ),
     );
     setEditRecord(null);
@@ -248,7 +283,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                       </div>
 
                       <p className="text-sm text-muted-foreground">
-                        {record.service}
+                        {record.serviceName}
                         {!isNote && record.username ? ` · ${record.username}` : ""}
                       </p>
 
@@ -267,7 +302,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                       </div>
 
                       <p className="text-xs text-muted-foreground">
-                        Updated {record.lastUpdated}
+                        Updated {formatDate(record.updatedAt)}
                       </p>
                     </div>
 
