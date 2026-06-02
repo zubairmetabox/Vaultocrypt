@@ -8,7 +8,7 @@ The goal of v1 is not public SaaS readiness. The goal is real weekly internal us
 
 Current state note:
 - Core data flows are wired to the real Neon/Postgres database (projects, records, categories, import)
-- `VaultRecord` shape from `src/lib/mock-data.ts` is still referenced as a type bridge in the project detail page — not for actual data
+- `src/lib/mock-data.ts` deleted — `RecordItem` and `RecordFormInput` now defined in the component layer, data flows directly from DB types
 - Import is wired end-to-end: CSV → dialog → `importClients` server action → DB
 - Category system is live: dynamic categories replace the old hardcoded Clients/Internal split
 - Move is live: bulk move projects between categories (button + drag-and-drop), move records between projects
@@ -429,4 +429,5 @@ These actions must be treated as privileged and audited:
 - **Category actions**: `src/components/app/category-actions.tsx` — rendered in `WorkspaceShell` header when `activeCategory` is set. Rename modal closes only when `categoryName` prop reflects the new value (same prop-watching pattern as sidebar move spinners).
 - **Audit**: `src/lib/audit.ts` — `writeAudit` helper; calls Clerk `currentUser()` and upserts the `User` row so actor is always resolved. All project and record mutations call `writeAudit`. Copy uses `copySecret` server action (not `revealSecret`) so the event is always captured.
 - **Audit UI**: `src/components/app/audit-actor-info.tsx` — shows actor name with a click-to-reveal email button. Used in both the project audit trail sidebar and the activity page. Timestamps are formatted in `Indian/Mauritius` (GMT+4) with no suffix.
+- **Record types**: `mock-data.ts` deleted. `RecordFormInput` and `RecordDraft` exported from `record-form-dialog.tsx`. `RecordItem = RecordFormInput & { id, updatedAt }` defined in `record-list.tsx`. Project page passes DB rows directly with no field renaming.
 - **Edit project details**: category dropdown added to the edit dialog (`project-details-card.tsx`). Saves `categoryId` via `updateProject` alongside other fields.
