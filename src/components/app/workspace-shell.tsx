@@ -27,7 +27,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+
 import { moveProjects } from "@/lib/actions/projects";
 import { SearchProvider, useSearch } from "@/contexts/search";
 import type { CategoryWithProjects } from "@/lib/actions/categories";
@@ -169,11 +169,11 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
                 <div className="hidden min-w-0 flex-1 items-center lg:flex">
                   <div className="flex w-full max-w-xl items-center gap-2 rounded-[1.25rem] border border-border/70 bg-card/70 px-3 py-2 shadow-sm">
                     <Search className="size-4 text-muted-foreground" />
-                    <Input
+                    <input
                       value={searchValue}
                       onChange={handleSearchChange}
                       placeholder="Search projects, records, and notes"
-                      className="h-auto border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0"
+                      className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground focus:placeholder-transparent"
                     />
                   </div>
                 </div>
