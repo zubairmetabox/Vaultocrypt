@@ -116,10 +116,10 @@ export function CategoryManageUsers({ categoryId, categoryName }: Props) {
                 <p className="text-sm text-muted-foreground">No users assigned yet.</p>
               ) : (
                 users.map((user) => {
-                  const name =
-                    [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-                    user.email ||
-                    "Unknown";
+                  const hasName = Boolean(user.firstName || user.lastName);
+                  const displayName = hasName
+                    ? [user.firstName, user.lastName].filter(Boolean).join(" ")
+                    : (user.email ?? "Unknown");
                   const isRemoving = removingUserId === user.userId && isPendingRemove;
 
                   return (
@@ -128,8 +128,8 @@ export function CategoryManageUsers({ categoryId, categoryName }: Props) {
                       className="flex items-center justify-between gap-3 rounded-[1.1rem] border border-border/70 bg-card/70 px-3 py-2"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">{name}</p>
-                        {user.email && (
+                        <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
+                        {hasName && user.email && (
                           <p className="truncate text-xs text-muted-foreground">{user.email}</p>
                         )}
                       </div>

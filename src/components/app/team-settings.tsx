@@ -58,10 +58,10 @@ export function TeamSettings({ admins }: Props) {
           <p className="text-sm text-muted-foreground">No admins yet.</p>
         ) : (
           admins.map((admin) => {
-            const name =
-              [admin.firstName, admin.lastName].filter(Boolean).join(" ") ||
-              admin.email ||
-              "Unknown";
+            const hasName = Boolean(admin.firstName || admin.lastName);
+            const name = hasName
+              ? [admin.firstName, admin.lastName].filter(Boolean).join(" ")
+              : (admin.email ?? "Unknown");
             const isRemoving = removingId === admin.id && isPendingRemove;
 
             return (
@@ -76,7 +76,7 @@ export function TeamSettings({ admins }: Props) {
                       <span className="ml-2 text-xs text-muted-foreground">(you)</span>
                     )}
                   </p>
-                  {admin.email && (
+                  {hasName && admin.email && (
                     <p className="truncate text-xs text-muted-foreground">{admin.email}</p>
                   )}
                 </div>
