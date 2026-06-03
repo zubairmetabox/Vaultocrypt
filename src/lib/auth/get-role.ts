@@ -11,10 +11,21 @@ export async function getCurrentRole(): Promise<AppRole> {
 
     const user = await prisma.user.findUnique({
       where: { clerkUserId },
-      select: { role: true },
+      select: { id: true, role: true },
     });
 
-    return user?.role === "ADMIN" ? "ADMIN" : "USER";
+    if (!user) return "USER";
+
+    // Bootstrap: if no admin exists yet, promote this user automatically
+    if (user.role !== "ADMIN") {
+      const adminCount = await prisma.user.count({ where: { role: "ADMIN" } });
+      if (adminCount === 0) {
+        await prisma.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
+        return "ADMIN";
+      }
+    }
+
+    return user.role === "ADMIN" ? "ADMIN" : "USER";
   } catch {
     return "USER";
   }
