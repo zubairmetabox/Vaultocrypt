@@ -1,7 +1,7 @@
 "use client";
 
-import { ChangeEvent, useCallback, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, FileUp, UploadCloud } from "lucide-react";
+import { ChangeEvent, useCallback, useRef, useState, useTransition } from "react";
+import { ArrowLeft, ArrowRight, FileUp, Loader2, UploadCloud } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -192,6 +192,7 @@ export function ImportDialog({ open, onOpenChange, onImport, categories = [] }: 
   const [columnMap, setColumnMap] = useState<Record<string, string>>({});
   const [categoryRouting, setCategoryRouting] = useState<Record<string, string>>({});
   const [importedCount, setImportedCount] = useState<{ clients: number; records: number } | null>(null);
+  const [isImporting, startImport] = useTransition();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -207,6 +208,7 @@ export function ImportDialog({ open, onOpenChange, onImport, categories = [] }: 
   }
 
   function handleDialogChange(nextOpen: boolean) {
+    if (isImporting) return;
     onOpenChange(nextOpen);
     if (!nextOpen) reset();
   }
@@ -261,13 +263,15 @@ export function ImportDialog({ open, onOpenChange, onImport, categories = [] }: 
     setStep("routing");
   }
 
-  async function handleRunImport() {
+  function handleRunImport() {
     if (!parsedFile) return;
     const clients = csvToClients(parsedFile.rows, columnMap, categoryRouting);
     const totalRecords = clients.reduce((sum, c) => sum + c.records.length, 0);
-    await onImport(clients);
-    setImportedCount({ clients: clients.length, records: totalRecords });
-    setStep("done");
+    startImport(async () => {
+      await onImport(clients);
+      setImportedCount({ clients: clients.length, records: totalRecords });
+      setStep("done");
+    });
   }
 
   // Unique folder names shown in the routing step
@@ -572,13 +576,16 @@ export function ImportDialog({ open, onOpenChange, onImport, categories = [] }: 
             </DialogBody>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setStep("mapping")}>
+              <Button variant="outline" onClick={() => setStep("mapping")} disabled={isImporting}>
                 <ArrowLeft className="size-4" />
                 Back
               </Button>
-              <Button onClick={handleRunImport}>
-                Import{parsedFile ? ` ${parsedFile.rows.length} row${parsedFile.rows.length === 1 ? "" : "s"}` : ""}
-                <ArrowRight className="size-4" />
+              <Button onClick={handleRunImport} disabled={isImporting}>
+                {isImporting ? (
+                  <><Loader2 className="size-4 animate-spin" /> Importing…</>
+                ) : (
+                  <>Import{parsedFile ? ` ${parsedFile.rows.length} row${parsedFile.rows.length === 1 ? "" : "s"}` : ""} <ArrowRight className="size-4" /></>
+                )}
               </Button>
             </DialogFooter>
           </>
