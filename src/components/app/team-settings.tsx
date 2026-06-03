@@ -1,10 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
-import { Loader2 } from "lucide-react";
+import { useRef, useState, useTransition } from "react";
+import { AlertCircle, Loader2, UserPlus } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -12,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { updateUserRole, type UserRow } from "@/lib/actions/users";
+import { inviteUser, updateUserRole, type UserRow } from "@/lib/actions/users";
 import { useRole } from "@/contexts/role";
 
 type Props = {
@@ -85,33 +88,102 @@ function UserRoleRow({
   );
 }
 
+function InviteForm() {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [email, setEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"ADMIN" | "USER">("USER");
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function handleInvite() {
+    if (!email.trim() || isPending) return;
+    setError(null);
+    startTransition(async () => {
+      try {
+        await inviteUser(email.trim(), inviteRole);
+        setEmail("");
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to add member.");
+      }
+    });
+  }
+
+  return (
+    <div className="space-y-3 rounded-[1.25rem] border border-dashed border-border/70 p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Add member
+      </p>
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <Label htmlFor="invite-email" className="sr-only">Email address</Label>
+          <Input
+            id="invite-email"
+            ref={inputRef}
+            type="email"
+            placeholder="team@metabox.mu"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleInvite()}
+            disabled={isPending}
+          />
+        </div>
+        <Select
+          value={inviteRole}
+          onValueChange={(v) => setInviteRole(v as "ADMIN" | "USER")}
+          disabled={isPending}
+        >
+          <SelectTrigger className="w-28">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="USER">User</SelectItem>
+            <SelectItem value="ADMIN">Admin</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button onClick={handleInvite} disabled={!email.trim() || isPending}>
+          {isPending ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
+        </Button>
+      </div>
+      {error && (
+        <div className="flex items-center gap-2 text-sm text-destructive">
+          <AlertCircle className="size-4 shrink-0" />
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TeamSettings({ users, currentUserId }: Props) {
   const role = useRole();
   const isAdmin = role === "ADMIN";
 
-  if (users.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        No team members have signed in yet.
-      </p>
-    );
-  }
-
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {!isAdmin && (
-        <p className="mb-3 text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Only Admins can change roles.
         </p>
       )}
-      {users.map((user) => (
-        <UserRoleRow
-          key={user.id}
-          user={user}
-          isSelf={user.id === currentUserId}
-          isAdmin={isAdmin}
-        />
-      ))}
+
+      {users.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No team members yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {users.map((user) => (
+            <UserRoleRow
+              key={user.id}
+              user={user}
+              isSelf={user.id === currentUserId}
+              isAdmin={isAdmin}
+            />
+          ))}
+        </div>
+      )}
+
+      {isAdmin && <InviteForm />}
     </div>
   );
 }

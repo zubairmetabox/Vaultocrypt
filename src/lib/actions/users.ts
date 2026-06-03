@@ -38,6 +38,23 @@ export async function getUsers(): Promise<UserRow[]> {
   }));
 }
 
+export async function inviteUser(email: string, role: "ADMIN" | "USER") {
+  const callerRole = await getCurrentRole();
+  if (callerRole !== "ADMIN") throw new Error("Unauthorized");
+
+  const trimmed = email.trim().toLowerCase();
+  if (!trimmed) throw new Error("Email is required.");
+
+  const existing = await prisma.user.findUnique({ where: { email: trimmed } });
+  if (existing) throw new Error("A team member with this email already exists.");
+
+  await prisma.user.create({
+    data: { email: trimmed, role: role as PrismaAppRole },
+  });
+
+  revalidatePath("/settings");
+}
+
 export async function updateUserRole(userId: string, newRole: "ADMIN" | "USER") {
   const callerRole = await getCurrentRole();
   if (callerRole !== "ADMIN") throw new Error("Unauthorized");
