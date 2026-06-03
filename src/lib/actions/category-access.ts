@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getCurrentRole } from "@/lib/auth/get-role";
+import { lookupClerkUserByEmail } from "@/lib/auth/clerk-lookup";
 import { prisma } from "@/lib/db";
 
 export type CategoryUserRow = {
@@ -93,7 +94,15 @@ export async function addUserToCategoryByEmail(categoryId: string, email: string
 
   let user = await prisma.user.findUnique({ where: { email: trimmed } });
   if (!user) {
-    user = await prisma.user.create({ data: { email: trimmed } });
+    const profile = await lookupClerkUserByEmail(trimmed);
+    user = await prisma.user.create({
+      data: {
+        email: trimmed,
+        clerkUserId: profile.clerkUserId ?? undefined,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+      },
+    });
   }
 
   if (user.role === "ADMIN") throw new Error("Admins already have access to all categories.");

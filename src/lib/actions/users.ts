@@ -6,6 +6,7 @@ import { auth } from "@clerk/nextjs/server";
 
 import { writeAudit } from "@/lib/audit";
 import { getCurrentRole } from "@/lib/auth/get-role";
+import { lookupClerkUserByEmail } from "@/lib/auth/clerk-lookup";
 import { prisma } from "@/lib/db";
 
 export type AdminRow = {
@@ -48,7 +49,16 @@ export async function addAdmin(email: string) {
     if (user.role === "ADMIN") throw new Error("This user is already an Admin.");
     await prisma.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
   } else {
-    user = await prisma.user.create({ data: { email: trimmed, role: "ADMIN" as PrismaAppRole } });
+    const profile = await lookupClerkUserByEmail(trimmed);
+    user = await prisma.user.create({
+      data: {
+        email: trimmed,
+        role: "ADMIN" as PrismaAppRole,
+        clerkUserId: profile.clerkUserId ?? undefined,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+      },
+    });
   }
 
   await writeAudit({
