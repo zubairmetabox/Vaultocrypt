@@ -6,7 +6,7 @@ Vaultocrypt v1 is an internal-only web app for MetaBox Technology to manage proj
 
 The goal of v1 is not public SaaS readiness. The goal is real weekly internal usage by the MetaBox team with strong security defaults, clean UX, and a practical operational foundation.
 
-Current state note:
+Current state note (as of 2026-06-03):
 - Core data flows are wired to the real Neon/Postgres database (projects, records, categories, import)
 - `src/lib/mock-data.ts` deleted — `RecordItem` and `RecordFormInput` now defined in the component layer, data flows directly from DB types
 - Import is wired end-to-end: CSV → dialog → `importClients` server action → DB
@@ -17,6 +17,8 @@ Current state note:
 - Category can also be changed from the Edit project details dialog
 - Audit event capture is live: all mutations write to AuditEvent; User rows auto-upserted from Clerk on first action
 - Activity page shows real audit events with actor name, click-to-reveal email, and exact GMT+4 timestamps
+- Search is live: shell header search bar filters project directory by name and records by title/service (3+ chars to activate)
+- All dialogs have inline error feedback; record create/edit hold open until server confirms
 - Migration-grade export and advanced import mapping are still outstanding
 
 ## Product Rules
@@ -170,14 +172,14 @@ Current state note:
 - [x] Add explicit `Copy` action with visible feedback
 - [x] Add `Move` action — two-step dialog: pick category → pick project → `moveRecord` server action
 - [ ] Add lightweight tag support
-- [ ] Add search and filtering for records
+- [x] Add search and filtering for records (and project directory) via shell header search bar
 
 ### Deliverables
 
 - [x] Full v1 record CRUD wired to real DB
 - [x] Secure reveal/copy workflow
 - [x] Move record between projects (two-step dialog, server action)
-- [ ] Practical record organization and lookup
+- [x] Practical record organization and lookup (search by title/service)
 
 ## Phase 7: Activity And Settings
 
@@ -276,7 +278,7 @@ Any new feature must satisfy all of them before it is considered done.
 - [x] **Record move** — loading dialog replaces move dialog while `moveRecord` is in flight.
 - [ ] **Import** — progress indicator during CSV parse and DB write.
 - [ ] **Export** — loading state while building the download blob.
-- [ ] **Reveal secret** — per-record spinner already present; audit event write should not add visible delay.
+- [x] **Reveal secret** — per-record spinner present; audit write is async and adds no visible delay.
 
 ### Dialog Behaviour
 
@@ -299,7 +301,7 @@ Any new feature must satisfy all of them before it is considered done.
 - [x] Record list — empty state with CTA to add first record.
 - [x] Category sidebar section — "No projects yet" when a category has no projects.
 - [x] Activity page — empty state when no audit events exist yet.
-- [ ] Search results — empty state when no matches found.
+- [x] Search results — empty state when no matches found (both directory and record list).
 
 ### Feedback Patterns
 
