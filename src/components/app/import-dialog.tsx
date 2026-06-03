@@ -228,11 +228,11 @@ export function ImportDialog({ open, onOpenChange, onImport, categories = [] }: 
     setStep("routing");
   }
 
-  function handleRunImport() {
+  async function handleRunImport() {
     if (!parsedFile) return;
     const clients = csvToClients(parsedFile.rows, columnMap, categoryRouting);
     const totalRecords = clients.reduce((sum, c) => sum + c.records.length, 0);
-    onImport(clients);
+    await onImport(clients);
     setImportedCount({ clients: clients.length, records: totalRecords });
     setStep("done");
   }
