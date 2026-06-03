@@ -18,7 +18,8 @@ Current state note (as of 2026-06-03):
 - Role system is live: two roles (Admin / User); first sign-in auto-promotes to Admin if no admin exists
 - Category-scoped access: non-admins only see categories assigned to them via Manage Users modal on each category page
 - Settings > Admins: add/remove admins by email; Clerk name lookup pre-fills name on add
-- Migration-grade export and advanced import mapping are still outstanding
+- Migration tooling complete: import parses Zoho SecretData blocks, auto-routes folders to categories, shows loader; Export all (Admin-only) decrypts every secret into a full CSV for round-trip verification
+- Record cards redesigned: URL and Username shown as labeled rows; URL is a clickable link
 
 ## Product Rules
 
@@ -226,7 +227,7 @@ Current state note (as of 2026-06-03):
 - [x] Upload CSV file
 - [x] Parse headers and rows safely
 - [x] Let the user map source columns to Vaultocrypt fields
-- [ ] Let the user define how source rows become which category (`Clients`, `Internal`, etc.)
+- [x] Let the user define how source rows become which category — auto-match by folder name + override step
 - [x] Provide a preview before import
 - [ ] Surface duplicate / conflict conditions before import
 - [x] Persist imported data into the real database
@@ -234,29 +235,31 @@ Current state note (as of 2026-06-03):
 
 ### Required Export Capabilities
 
-- [ ] Rework export around full record-level data, not only selected projects
-- [ ] Add a migration-verification export mode
-- [ ] Export deterministic row structure suitable for file-to-file comparison
-- [ ] Include enough fields to validate imported records correctly
-- [ ] Decide whether secret export should be allowed, masked, or optional
+- [x] Rework export around full record-level data (Export all — category, project, record, URL, username, password, notes)
+- [x] Add a migration-verification export mode
+- [x] Export deterministic row structure suitable for file-to-file comparison
+- [x] Include enough fields to validate imported records correctly
+- [x] Secret export allowed (Admin-only; decrypted; delete file after verification)
 
 ### Proposed Verification Export Scope
 
-- [ ] Category name
-- [ ] Project name
-- [ ] Record title
-- [ ] URL
-- [ ] Username
-- [ ] Notes
-- [ ] Record type
-- [ ] Status
+- [x] Category name
+- [x] Project name
+- [x] Record title
+- [x] URL
+- [x] Username
+- [x] Notes
+- [x] Record type
+- [x] Status
 - [ ] Optional source/import metadata for debugging
 
 ### Deliverables
 
-- [ ] User-controlled import mapping tool with category routing
+- [x] User-controlled import mapping tool with category routing (auto-match + override)
 - [x] Preview-first import workflow with mapping and execution
-- [ ] Migration-grade export
+- [x] Migration-grade export (Export all, Admin-only, decrypted secrets)
+- [x] Zoho SecretData structured block parsed correctly (username + password extracted)
+- [x] Round-trip verification process ready (export Zoho → import → export Vaultocrypt → compare)
 - [ ] Round-trip verification process against Zoho export
 
 ## UX Standards
@@ -407,7 +410,7 @@ These actions must be treated as privileged and audited:
 6. [x] Build project management (directory, detail, category system, move)
 7. [x] Build record management (CRUD, reveal/copy, move)
 8. [x] Build activity and settings surfaces
-9. [ ] Build import mapping UI and migration-grade export
+9. [x] Build import mapping UI and migration-grade export
 10. [ ] Prepare deployment and internal rollout
 
 ## Handoff Notes
