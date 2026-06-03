@@ -326,10 +326,33 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                         </Badge>
                       </div>
 
-                      <p className="text-sm text-muted-foreground">
-                        {record.serviceName}
-                        {!isNote && record.username ? ` · ${record.username}` : ""}
-                      </p>
+                      <div className="space-y-0.5">
+                        {record.url ? (
+                          <div className="flex items-baseline gap-2">
+                            <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">URL</span>
+                            <a
+                              href={record.url.startsWith("http") ? record.url : `https://${record.url}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="min-w-0 truncate text-sm text-foreground hover:underline"
+                            >
+                              {record.serviceName || record.url}
+                            </a>
+                          </div>
+                        ) : record.serviceName ? (
+                          <div className="flex items-baseline gap-2">
+                            <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">Service</span>
+                            <span className="text-sm text-foreground">{record.serviceName}</span>
+                          </div>
+                        ) : null}
+                        {!isNote && record.username && (
+                          <div className="flex items-baseline gap-2">
+                            <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">Username</span>
+                            <span className="min-w-0 truncate text-sm text-foreground">{record.username}</span>
+                          </div>
+                        )}
+                      </div>
 
                       <div className="flex items-center gap-2">
                         <code
