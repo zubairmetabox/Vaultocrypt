@@ -24,8 +24,11 @@ export function parseCsvText(text: string): ParsedCsvFile {
     transformHeader: (header) => header.trim(),
   });
 
-  if (result.errors.length > 0) {
-    const firstError = result.errors[0];
+  // FieldMismatch (too many / too few fields) is non-fatal — PapaParse still
+  // parses the row. Only throw on structural errors like bad quoting.
+  const fatalErrors = result.errors.filter((e) => e.type !== "FieldMismatch");
+  if (fatalErrors.length > 0) {
+    const firstError = fatalErrors[0];
     throw new Error(
       `CSV parse error on row ${firstError.row ?? "unknown"}: ${firstError.message}`,
     );
