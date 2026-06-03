@@ -52,6 +52,7 @@ import { createProject, deleteProjects, moveProjects, type ProjectRow } from "@/
 import { importClients, type ImportClientInput } from "@/lib/actions/import";
 import type { CategoryRow } from "@/lib/actions/categories";
 import { useSearch } from "@/contexts/search";
+import { useRole } from "@/contexts/role";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
@@ -154,6 +155,8 @@ function DraggableProjectCard({
 export function ProjectDirectory({ initialProjects, categories, defaultCategoryId }: Props) {
   const router = useRouter();
   const { query } = useSearch();
+  const role = useRole();
+  const isAdmin = role === "ADMIN";
 
   const [isPending, startTransition] = useTransition();
   const [isMoving, startMove] = useTransition();
@@ -330,6 +333,7 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
               </CardDescription>
             </div>
 
+            {isAdmin && (
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" variant="outline" onClick={toggleSelectAll}>
                 {allSelected ? "Clear all" : "Select all"}
@@ -391,19 +395,23 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
                 </>
               )}
             </div>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="lg" variant="outline" onClick={() => setImportOpen(true)}>
-              <FileUp className="size-4" />
-              Import CSV
-            </Button>
-
-            <ImportDialog
-              open={importOpen}
-              onOpenChange={setImportOpen}
-              onImport={handleImport}
-            />
+            {isAdmin && (
+              <>
+                <Button size="lg" variant="outline" onClick={() => setImportOpen(true)}>
+                  <FileUp className="size-4" />
+                  Import CSV
+                </Button>
+                <ImportDialog
+                  open={importOpen}
+                  onOpenChange={setImportOpen}
+                  onImport={handleImport}
+                />
+              </>
+            )}
 
             {/* Add project dialog */}
             <Dialog

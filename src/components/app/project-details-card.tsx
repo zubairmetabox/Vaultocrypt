@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRightLeft, Building2, Check, Folder, FolderKanban, Loader2, PencilLine } from "lucide-react";
+import { useRole } from "@/contexts/role";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,6 +76,8 @@ export function ProjectDetailsCard({
   categories,
 }: ProjectDetailsCardProps) {
   const router = useRouter();
+  const role = useRole();
+  const isAdmin = role === "ADMIN";
   const [isEditPending, startEditTransition] = useTransition();
   const [isMovePending, startMoveTransition] = useTransition();
 
@@ -193,8 +196,8 @@ export function ProjectDetailsCard({
         <div className="flex items-center gap-2">
           <Badge variant={statusBadgeVariant(details.status)}>{details.status}</Badge>
 
-          {/* ── Move category dialog ── */}
-          <Dialog open={moveOpen} onOpenChange={handleMoveOpenChange}>
+          {/* ── Move category dialog (Admin only) ── */}
+          {isAdmin && <Dialog open={moveOpen} onOpenChange={handleMoveOpenChange}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline">
                 <ArrowRightLeft className="size-4" />
@@ -269,6 +272,8 @@ export function ProjectDetailsCard({
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          }
 
           {/* ── Edit details dialog ── */}
           <Dialog open={editOpen} onOpenChange={handleEditOpenChange}>

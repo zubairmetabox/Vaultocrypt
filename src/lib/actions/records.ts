@@ -135,6 +135,20 @@ export type UpdateRecordInput = {
 };
 
 export async function updateRecord(recordId: string, projectId: string, input: UpdateRecordInput) {
+  // Snapshot current values before overwriting so history can be revealed later
+  const prev = await db.record.findUniqueOrThrow({
+    where: { id: recordId },
+    select: {
+      title: true,
+      type: true,
+      serviceName: true,
+      url: true,
+      username: true,
+      secretCipher: true,
+      notes: true,
+    },
+  });
+
   const record = await db.record.update({
     where: { id: recordId },
     data: {
@@ -150,14 +164,27 @@ export async function updateRecord(recordId: string, projectId: string, input: U
       ...(input.sensitivity !== undefined && { sensitivity: input.sensitivity as RecordSensitivity }),
     },
   });
+
   await writeAudit({
     action: AuditAction.RECORD_UPDATED,
     resource: "record",
     resourceId: recordId,
     projectId,
     recordId,
-    metadata: { updatedFields: Object.keys(input) },
+    metadata: {
+      updatedFields: Object.keys(input),
+      prev: {
+        title: prev.title,
+        type: prev.type,
+        serviceName: prev.serviceName,
+        url: prev.url,
+        username: prev.username,
+        secretCipher: prev.secretCipher, // stored encrypted — revealed via revealAuditValues
+        notes: prev.notes,
+      },
+    },
   });
+
   revalidatePath(`/projects/${projectId}`);
   return record;
 }
@@ -172,6 +199,41 @@ export async function deleteRecord(recordId: string, projectId: string) {
   });
   await db.record.delete({ where: { id: recordId } });
   revalidatePath(`/projects/${projectId}`);
+}
+
+export type AuditPrevValues = {
+  title: string | null;
+  type: string | null;
+  serviceName: string | null;
+  url: string | null;
+  username: string | null;
+  secret: string | null;
+  notes: string | null;
+};
+
+/** Admin-only: decrypts and returns the previous field values stored in an audit event. */
+export async function revealAuditValues(auditEventId: string): Promise<AuditPrevValues> {
+  const { getCurrentRole } = await import("@/lib/auth/get-role");
+  const role = await getCurrentRole();
+  if (role !== "ADMIN") throw new Error("Unauthorized");
+
+  const event = await db.auditEvent.findUniqueOrThrow({
+    where: { id: auditEventId },
+    select: { metadata: true },
+  });
+
+  const meta = event.metadata as Record<string, unknown> | null;
+  const prev = (meta?.prev ?? {}) as Record<string, unknown>;
+
+  return {
+    title: (prev.title as string | null) ?? null,
+    type: (prev.type as string | null) ?? null,
+    serviceName: (prev.serviceName as string | null) ?? null,
+    url: (prev.url as string | null) ?? null,
+    username: (prev.username as string | null) ?? null,
+    secret: prev.secretCipher ? decrypt(prev.secretCipher as string) : null,
+    notes: (prev.notes as string | null) ?? null,
+  };
 }
 
 export async function moveRecord(recordId: string, fromProjectId: string, toProjectId: string) {

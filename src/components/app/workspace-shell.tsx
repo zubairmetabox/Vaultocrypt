@@ -30,12 +30,15 @@ import {
 
 import { moveProjects } from "@/lib/actions/projects";
 import { SearchProvider, useSearch } from "@/contexts/search";
+import { RoleProvider } from "@/contexts/role";
+import type { AppRole } from "@/lib/auth/get-role";
 import type { CategoryWithProjects } from "@/lib/actions/categories";
 
 type WorkspaceShellProps = {
   children: React.ReactNode;
   clerkEnabled: boolean;
   categories: CategoryWithProjects[];
+  role: AppRole;
 };
 
 const staticPageMeta: Record<string, { title: string; eyebrow?: string }> = {
@@ -44,13 +47,15 @@ const staticPageMeta: Record<string, { title: string; eyebrow?: string }> = {
   "/settings": { title: "Settings", eyebrow: "Preferences and controls" },
 };
 
-export function WorkspaceShell({ children, clerkEnabled, categories }: WorkspaceShellProps) {
+export function WorkspaceShell({ children, clerkEnabled, categories, role }: WorkspaceShellProps) {
   return (
-    <SearchProvider>
-      <WorkspaceShellInner clerkEnabled={clerkEnabled} categories={categories}>
-        {children}
-      </WorkspaceShellInner>
-    </SearchProvider>
+    <RoleProvider role={role}>
+      <SearchProvider>
+        <WorkspaceShellInner clerkEnabled={clerkEnabled} categories={categories} role={role}>
+          {children}
+        </WorkspaceShellInner>
+      </SearchProvider>
+    </RoleProvider>
   );
 }
 

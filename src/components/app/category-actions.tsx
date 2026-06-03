@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Loader2, Pencil, Trash2 } from "lucide-react";
+import { useRole } from "@/contexts/role";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +27,7 @@ type Props = {
 export function CategoryActions({ categoryId, categoryName, isDefault, projectCount }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const role = useRole();
 
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState(categoryName);
@@ -78,6 +80,8 @@ export function CategoryActions({ categoryId, categoryName, isDefault, projectCo
       }
     });
   }
+
+  if (role !== "ADMIN") return null;
 
   return (
     <>

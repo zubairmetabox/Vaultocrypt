@@ -2,12 +2,14 @@ import { notFound } from "next/navigation";
 import { AlertTriangle, ShieldCheck } from "lucide-react";
 
 import { AuditActorInfo } from "@/components/app/audit-actor-info";
+import { AuditOldValues } from "@/components/app/audit-old-values";
 import { ProjectDetailsCard } from "@/components/app/project-details-card";
 import { RecordList } from "@/components/app/record-list";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { getCategories } from "@/lib/actions/categories";
 import { getProjectWithRecords } from "@/lib/actions/projects";
+import { getCurrentRole } from "@/lib/auth/get-role";
 
 type ProjectPageProps = {
   params: Promise<{ projectId: string }>;
@@ -35,9 +37,10 @@ function formatUpdated(date: Date): string {
 
 export default async function ProjectPage({ params }: ProjectPageProps) {
   const { projectId } = await params;
-  const [project, categories] = await Promise.all([
+  const [project, categories, role] = await Promise.all([
     getProjectWithRecords(projectId),
     getCategories(),
+    getCurrentRole(),
   ]);
 
   if (!project) notFound();
@@ -118,7 +121,14 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                       {event.action.replace(/_/g, " ").toLowerCase()} · {event.resource}
                     </p>
                   </div>
-                  <Badge variant="outline" className="shrink-0">{event.action}</Badge>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <Badge variant="outline">{event.action}</Badge>
+                    {role === "ADMIN" &&
+                      event.action === "RECORD_UPDATED" &&
+                      Boolean((event.metadata as Record<string, unknown> | null)?.prev) && (
+                        <AuditOldValues auditEventId={event.id} />
+                      )}
+                  </div>
                 </div>
                 <p className="mt-3 text-xs text-muted-foreground">
                   {formatUpdated(event.createdAt)}

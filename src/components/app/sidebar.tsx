@@ -15,6 +15,7 @@ import {
   Settings2,
 } from "lucide-react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { useRole } from "@/contexts/role";
 
 import { BrandMark } from "@/components/app/brand-mark";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ type SidebarProps = {
 
 export function Sidebar({ pathname, categories, pendingCategoryIds = [] }: SidebarProps) {
   const router = useRouter();
+  const role = useRole();
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -127,15 +129,17 @@ export function Sidebar({ pathname, categories, pendingCategoryIds = [] }: Sideb
           );
         })}
 
-        {/* ── Add category ────────────────────────────────────────────────── */}
-        <button
-          type="button"
-          onClick={() => setAddOpen(true)}
-          className="flex items-center gap-2 rounded-[1.25rem] px-3 py-2 text-xs font-medium text-muted-foreground transition-all duration-200 hover:bg-muted/70 hover:text-foreground"
-        >
-          <Plus className="size-3.5" />
-          Add category
-        </button>
+        {/* ── Add category (Admin only) ─────────────────────────────────── */}
+        {role === "ADMIN" && (
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className="flex items-center gap-2 rounded-[1.25rem] px-3 py-2 text-xs font-medium text-muted-foreground transition-all duration-200 hover:bg-muted/70 hover:text-foreground"
+          >
+            <Plus className="size-3.5" />
+            Add category
+          </button>
+        )}
 
         {/* ── Bottom nav ──────────────────────────────────────────────────── */}
         <div className="mt-auto space-y-1 pt-2">

@@ -41,6 +41,7 @@ import {
 import type { CategoryWithProjects } from "@/lib/actions/categories";
 import type { RecordDraft, RecordFormInput } from "@/components/app/record-form-dialog";
 import { useSearch } from "@/contexts/search";
+import { useRole } from "@/contexts/role";
 
 export type RecordItem = RecordFormInput & {
   id: string;
@@ -69,6 +70,8 @@ function formatDate(date: Date): string {
 
 export function RecordList({ projectId, initialRecords, categories }: RecordListProps) {
   const { query } = useSearch();
+  const role = useRole();
+  const isAdmin = role === "ADMIN";
   const router = useRouter();
   const [isCreating, startCreate] = useTransition();
   const [isEditing, startEdit] = useTransition();
@@ -385,7 +388,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                         Edit
                       </Button>
 
-                      {categories && categories.length > 0 && (
+                      {isAdmin && categories && categories.length > 0 && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -396,14 +399,16 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                         </Button>
                       )}
 
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => setDeleteTarget({ id: record.id, title: record.title })}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
+                      {isAdmin && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => setDeleteTarget({ id: record.id, title: record.title })}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
