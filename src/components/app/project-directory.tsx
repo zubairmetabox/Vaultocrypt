@@ -50,6 +50,7 @@ import {
 import { useDraggable } from "@dnd-kit/core";
 import { createProject, deleteProjects, moveProjects, type ProjectRow } from "@/lib/actions/projects";
 import { importClients, type ImportClientInput } from "@/lib/actions/import";
+import { exportAllRecords } from "@/lib/actions/export";
 import type { CategoryRow } from "@/lib/actions/categories";
 import { useSearch } from "@/contexts/search";
 import { useRole } from "@/contexts/role";
@@ -171,6 +172,7 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [isExporting, startExport] = useTransition();
 
   // Add project form state
   const [newName, setNewName] = useState("");
@@ -320,6 +322,22 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
     router.refresh();
   }
 
+  // ── Export all ──────────────────────────────────────────────────────────────
+
+  function handleExportAll() {
+    startExport(async () => {
+      const csv = await exportAllRecords();
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `vaultocrypt-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  }
+
   return (
     <>
     <Card className="border-border/70 bg-card/95">
@@ -401,6 +419,17 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
           <div className="flex flex-wrap items-center gap-2">
             {isAdmin && (
               <>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={handleExportAll}
+                  disabled={isExporting}
+                >
+                  {isExporting
+                    ? <Loader2 className="size-4 animate-spin" />
+                    : <Download className="size-4" />}
+                  Export all
+                </Button>
                 <Button size="lg" variant="outline" onClick={() => setImportOpen(true)}>
                   <FileUp className="size-4" />
                   Import CSV
@@ -409,6 +438,7 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
                   open={importOpen}
                   onOpenChange={setImportOpen}
                   onImport={handleImport}
+                  categories={categories}
                 />
               </>
             )}

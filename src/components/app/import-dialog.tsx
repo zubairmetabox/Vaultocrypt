@@ -34,6 +34,7 @@ import {
 import { parseCsvText } from "@/lib/imports/csv";
 import { type ParsedCsvFile, type ParsedCsvRow } from "@/lib/imports/types";
 import type { ImportClientInput } from "@/lib/actions/import";
+import type { CategoryRow } from "@/lib/actions/categories";
 
 // ─── Auto-detect field mapping from header names ──────────────────────────────
 
@@ -55,6 +56,22 @@ function autoDetect(headers: string[]): Record<string, string> {
   );
 }
 
+// ─── Auto-match folder names to categories ───────────────────────────────────
+
+function buildCategoryRouting(
+  folderNames: string[],
+  categories: CategoryRow[],
+): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const folder of folderNames) {
+    const match = categories.find(
+      (c) => c.name.toLowerCase() === folder.toLowerCase(),
+    );
+    if (match) result[folder] = match.id;
+  }
+  return result;
+}
+
 // ─── CSV rows → Client objects ────────────────────────────────────────────────
 
 function hostnameFrom(url: string): string {
@@ -69,6 +86,7 @@ function hostnameFrom(url: string): string {
 function csvToClients(
   rows: ParsedCsvRow[],
   columnMap: Record<string, string>,
+  categoryRouting: Record<string, string> = {},
 ): ImportClientInput[] {
   const fieldToCol: Partial<Record<string, string>> = {};
   for (const [col, field] of Object.entries(columnMap)) {
@@ -110,8 +128,7 @@ function csvToClients(
     const rawStatus = pick(clientRows[0]!, "client_status").toLowerCase();
     result.push({
       name: clientName,
-      // categoryId resolved server-side after import; omit for now
-
+      categoryId: categoryRouting[clientName] ?? undefined,
       contact: pick(clientRows[0]!, "client_contact") || undefined,
       vertical: pick(clientRows[0]!, "client_vertical") || undefined,
       status: rawStatus === "inactive" ? "INACTIVE" : "ACTIVE",
@@ -124,21 +141,23 @@ function csvToClients(
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-type Step = "upload" | "mapping" | "done";
+type Step = "upload" | "mapping" | "routing" | "done";
 
 type ImportDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImport: (clients: ImportClientInput[]) => Promise<void>;
+  categories?: CategoryRow[];
 };
 
-export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
+export function ImportDialog({ open, onOpenChange, onImport, categories = [] }: ImportDialogProps) {
   const [step, setStep] = useState<Step>("upload");
   const [parsedFile, setParsedFile] = useState<ParsedCsvFile | null>(null);
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [columnMap, setColumnMap] = useState<Record<string, string>>({});
+  const [categoryRouting, setCategoryRouting] = useState<Record<string, string>>({});
   const [importedCount, setImportedCount] = useState<{ clients: number; records: number } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -150,6 +169,7 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
     setError("");
     setIsDragging(false);
     setColumnMap({});
+    setCategoryRouting({});
     setImportedCount(null);
   }
 
@@ -194,14 +214,33 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
     setStep("mapping");
   }
 
+  function handleContinueToRouting() {
+    if (!parsedFile) return;
+    // Collect unique folder names from the column mapped to entry_name
+    const folderCol = Object.entries(columnMap).find(([, v]) => v === "entry_name")?.[0];
+    const folderNames = folderCol
+      ? [...new Set(parsedFile.rows.map((r) => {
+          const raw = r[folderCol]?.trim() ?? "";
+          return raw.includes("/") ? raw.split("/").pop()!.trim() : raw || "Imported";
+        }))]
+      : ["Imported"];
+    setCategoryRouting(buildCategoryRouting(folderNames, categories));
+    setStep("routing");
+  }
+
   function handleRunImport() {
     if (!parsedFile) return;
-    const clients = csvToClients(parsedFile.rows, columnMap);
+    const clients = csvToClients(parsedFile.rows, columnMap, categoryRouting);
     const totalRecords = clients.reduce((sum, c) => sum + c.records.length, 0);
     onImport(clients);
     setImportedCount({ clients: clients.length, records: totalRecords });
     setStep("done");
   }
+
+  // Unique folder names shown in the routing step
+  const routingFolders = Object.keys(categoryRouting).length > 0
+    ? Object.keys(categoryRouting)
+    : ["Imported"];
 
   const preview = parsedFile
     ? { headers: parsedFile.headers, rows: parsedFile.rows.slice(0, 5), total: parsedFile.rows.length }
@@ -429,15 +468,90 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
                 <ArrowLeft className="size-4" />
                 Back
               </Button>
-              <Button onClick={handleRunImport} disabled={mappedCount === 0}>
-                Import {parsedFile.rows.length} record{parsedFile.rows.length === 1 ? "" : "s"}
+              <Button onClick={handleContinueToRouting} disabled={mappedCount === 0}>
+                Assign categories
                 <ArrowRight className="size-4" />
               </Button>
             </DialogFooter>
           </>
         )}
 
-        {/* ── Step 3: Done ── */}
+        {/* ── Step 3: Category routing ── */}
+        {step === "routing" && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Assign categories</DialogTitle>
+              <DialogDescription>
+                Each folder in your CSV has been matched to a Vaultocrypt category. Adjust any
+                that are wrong before importing.
+              </DialogDescription>
+            </DialogHeader>
+
+            <DialogBody>
+              <div className="grid gap-3">
+                {routingFolders.map((folder) => {
+                  const matched = categoryRouting[folder];
+                  return (
+                    <div
+                      key={folder}
+                      className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-[1.25rem] border border-border/70 bg-background/80 px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Folder</p>
+                        <p className="truncate text-sm font-medium text-foreground">{folder}</p>
+                      </div>
+                      <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Category</p>
+                        <Select
+                          value={matched ?? "__none__"}
+                          onValueChange={(v) =>
+                            setCategoryRouting((prev) => ({
+                              ...prev,
+                              [folder]: v === "__none__" ? "" : v,
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="mt-1 w-full">
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">— No category —</SelectItem>
+                            <SelectSeparator />
+                            {categories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id}>
+                                {cat.name}
+                                {cat.name.toLowerCase() === folder.toLowerCase() && " ✓"}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <p className="text-xs text-muted-foreground">
+                  Folders with no category assigned will be imported without one and appear
+                  uncategorised.
+                </p>
+              </div>
+            </DialogBody>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setStep("mapping")}>
+                <ArrowLeft className="size-4" />
+                Back
+              </Button>
+              <Button onClick={handleRunImport}>
+                Import{parsedFile ? ` ${parsedFile.rows.length} row${parsedFile.rows.length === 1 ? "" : "s"}` : ""}
+                <ArrowRight className="size-4" />
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+
+        {/* ── Step 4: Done ── */}
         {step === "done" && importedCount && (
           <>
             <DialogHeader>
