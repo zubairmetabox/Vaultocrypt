@@ -8,17 +8,16 @@ The goal of v1 is not public SaaS readiness. The goal is real weekly internal us
 
 Current state note (as of 2026-06-03):
 - Core data flows are wired to the real Neon/Postgres database (projects, records, categories, import)
-- `src/lib/mock-data.ts` deleted — `RecordItem` and `RecordFormInput` now defined in the component layer, data flows directly from DB types
+- `src/lib/mock-data.ts` deleted — `RecordItem` and `RecordFormInput` defined in component layer
 - Import is wired end-to-end: CSV → dialog → `importClients` server action → DB
-- Category system is live: dynamic categories replace the old hardcoded Clients/Internal split
-- Move is live: bulk move projects between categories (button + drag-and-drop), move records between projects
-- Drag-and-drop is live: projects draggable via grip handle in directory, sidebar projects draggable; sidebar category rows are drop zones
-- Category rename and delete available on each category page (header actions)
-- Category can also be changed from the Edit project details dialog
-- Audit event capture is live: all mutations write to AuditEvent; User rows auto-upserted from Clerk on first action
-- Activity page shows real audit events with actor name, click-to-reveal email, and exact GMT+4 timestamps
-- Search is live: shell header search bar filters project directory by name and records by title/service (3+ chars to activate)
-- All dialogs have inline error feedback; record create/edit hold open until server confirms
+- Category system is live: dynamic categories, rename/delete, drag-and-drop organisation
+- Move is live: bulk move projects (button + drag), move records (two-step dialog)
+- Audit event capture is live: all mutations write to AuditEvent; audit trail on project pages with click-to-reveal actor email and GMT+4 timestamps; Admins can reveal old record values per update event
+- Search is live: shell header search filters project directory by name and records by title/service (3+ chars)
+- All dialogs have inline error feedback
+- Role system is live: two roles (Admin / User); first sign-in auto-promotes to Admin if no admin exists
+- Category-scoped access: non-admins only see categories assigned to them via Manage Users modal on each category page
+- Settings > Admins: add/remove admins by email; Clerk name lookup pre-fills name on add
 - Migration-grade export and advanced import mapping are still outstanding
 
 ## Product Rules
@@ -100,14 +99,14 @@ Current state note (as of 2026-06-03):
 - [x] Integrate `Clerk` with email/password authentication
 - [x] Protect authenticated routes
 - [x] Define v1 roles: `Admin`, `Project Manager`, `User`
-- [ ] Add basic role-aware UI visibility rules
-- [ ] Establish an internal authorization layer for role checks
+- [x] Add basic role-aware UI visibility rules (Admin vs User; destructive/structural actions hidden for Users)
+- [x] Establish an internal authorization layer for role checks (getCurrentRole + RoleContext)
 
 ### Deliverables
 
 - [x] Working sign-in and protected app routes
 - [x] Role model available in app logic
-- [ ] Simple access-aware UI states
+- [x] Simple access-aware UI states (category-scoped access for non-admins)
 
 ## Phase 4: Data Model And Security Core
 
@@ -378,7 +377,7 @@ These actions must be treated as privileged and audited:
 - [x] Copy secret
 - [x] Delete project (logged before delete)
 - [x] Delete record (logged before delete)
-- [ ] Change role
+- [x] Change role (ROLE_CHANGED audit event written on addAdmin/removeAdmin)
 - [ ] Change restriction
 
 ## Manual Verification Focus
@@ -422,14 +421,14 @@ These actions must be treated as privileged and audited:
   - `src/lib/actions/categories.ts` — `getCategories`, `getProjectsByCategory`, `createCategory`, `updateCategory`, `deleteCategory`
   - `src/lib/actions/records.ts` — `getRecords`, `revealSecret`, `copySecret`, `createRecord`, `updateRecord`, `deleteRecord`, `moveRecord`
   - `src/lib/actions/import.ts` — `importClients`
-- `revealSecret` is the only place decryption happens — server-only, never exposed to the client bundle.
-- `VaultRecord` type from `src/lib/mock-data.ts` is still used as a shape bridge in the project detail page to pass records into `RecordList`. The actual data comes from the DB. This type reference should be cleaned up when `RecordList` is refactored to accept `RecordRow` directly.
-- CSV parsing helpers live in `src/lib/imports/csv.ts` and canonical import field types live in `src/lib/imports/types.ts`.
-- Existing CSV export is only a small project-directory bulk export (project metadata only, no records), not a record-level migration export.
+- `revealSecret` and `copySecret` are the only decryption points — server-only, never in the client bundle.
+- `mock-data.ts` deleted. `RecordFormInput`, `RecordDraft` in `record-form-dialog.tsx`. `RecordItem` in `record-list.tsx`. No field renaming at the page boundary.
+- CSV parsing helpers: `src/lib/imports/csv.ts`, types: `src/lib/imports/types.ts`.
+- Existing CSV export: project metadata only — not migration-grade.
 - Routes: `/` (project directory), `/categories/[categoryId]`, `/projects/[projectId]`, `/activity`, `/settings`, `/sign-in`, `/sign-up`.
-- **Drag-and-drop**: `@dnd-kit/core` with `DndContext` in `WorkspaceShell`. `onDragEnd` calls `moveProjects`. Sidebar category rows use `useDroppable`; directory cards and sidebar project links use `useDraggable`. Sidebar move spinners clear via `useEffect` on the `categories` prop, not on server action return.
-- **Category actions**: `src/components/app/category-actions.tsx` — rendered in `WorkspaceShell` header when `activeCategory` is set. Rename modal closes only when `categoryName` prop reflects the new value (same prop-watching pattern as sidebar move spinners).
-- **Audit**: `src/lib/audit.ts` — `writeAudit` helper; calls Clerk `currentUser()` and upserts the `User` row so actor is always resolved. All project and record mutations call `writeAudit`. Copy uses `copySecret` server action (not `revealSecret`) so the event is always captured.
-- **Audit UI**: `src/components/app/audit-actor-info.tsx` — shows actor name with a click-to-reveal email button. Used in both the project audit trail sidebar and the activity page. Timestamps are formatted in `Indian/Mauritius` (GMT+4) with no suffix.
-- **Record types**: `mock-data.ts` deleted. `RecordFormInput` and `RecordDraft` exported from `record-form-dialog.tsx`. `RecordItem = RecordFormInput & { id, updatedAt }` defined in `record-list.tsx`. Project page passes DB rows directly with no field renaming.
-- **Edit project details**: category dropdown added to the edit dialog (`project-details-card.tsx`). Saves `categoryId` via `updateProject` alongside other fields.
+- **Drag-and-drop**: `@dnd-kit/core` in `WorkspaceShell`. Category rows droppable, directory cards + sidebar project links draggable (grip handle on cards). Move spinners clear on `categories` prop change, not server action return.
+- **Category actions**: `category-actions.tsx` rendered in shell header for active category. Includes Rename, Delete (non-default only), and Manage Users (Admin only).
+- **Audit**: `src/lib/audit.ts` — Clerk `currentUser()` upsert with email-based stub merge. All mutations instrumented. `updateRecord` snapshots prev values incl. encrypted `secretCipher` into metadata; `revealAuditValues()` decrypts for Admins. `audit-actor-info.tsx` (click-to-reveal email), `audit-old-values.tsx` (Old values button on RECORD_UPDATED).
+- **Roles**: `src/lib/auth/get-role.ts` + `src/contexts/role.tsx`. Admin = all access. User = create/edit records + reveal/copy; no delete/move/restructure. First user auto-promoted to Admin. `CategoryAccess` join table gates category visibility for non-admins.
+- **Settings**: Admin list with add/remove. `lookupClerkUserByEmail()` pre-fills name from Clerk on add. Category pages have Manage Users modal (add/remove non-admins by email).
+- **Server actions**: `projects.ts`, `categories.ts`, `records.ts` (+ `revealAuditValues`), `import.ts`, `users.ts`, `category-access.ts`.
