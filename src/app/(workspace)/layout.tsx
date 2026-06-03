@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { WorkspaceShell } from "@/components/app/workspace-shell";
 import { getCategories } from "@/lib/actions/categories";
 import { getCurrentRole } from "@/lib/auth/get-role";
