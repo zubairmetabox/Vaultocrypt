@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { deleteCategory, updateCategory } from "@/lib/actions/categories";
+import { CategoryManageUsers } from "@/components/app/category-manage-users";
 
 type Props = {
   categoryId: string;
@@ -86,6 +87,8 @@ export function CategoryActions({ categoryId, categoryName, isDefault, projectCo
   return (
     <>
       <div className="flex items-center gap-2">
+        <CategoryManageUsers categoryId={categoryId} categoryName={categoryName} />
+
         <Button
           size="sm"
           variant="outline"

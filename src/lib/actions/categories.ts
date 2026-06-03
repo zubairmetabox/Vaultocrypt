@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
+import { getCurrentRole } from "@/lib/auth/get-role";
 import { prisma as db } from "@/lib/db";
+import { auth } from "@clerk/nextjs/server";
 import type { ProjectRow } from "@/lib/actions/projects";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -54,7 +56,25 @@ export async function getCategories(): Promise<CategoryWithProjects[]> {
   await ensureDefaults();
   await migrateOrphans();
 
+  const role = await getCurrentRole();
+  let accessibleCategoryIds: string[] | null = null;
+
+  if (role !== "ADMIN") {
+    // Non-admins: only return categories they've been explicitly granted access to
+    const { userId: clerkUserId } = await auth();
+    if (clerkUserId) {
+      const user = await db.user.findUnique({
+        where: { clerkUserId },
+        select: { categoryAccess: { select: { categoryId: true } } },
+      });
+      accessibleCategoryIds = user?.categoryAccess.map((a) => a.categoryId) ?? [];
+    } else {
+      accessibleCategoryIds = [];
+    }
+  }
+
   const rows = await db.category.findMany({
+    where: accessibleCategoryIds !== null ? { id: { in: accessibleCategoryIds } } : undefined,
     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
     include: {
       projects: {

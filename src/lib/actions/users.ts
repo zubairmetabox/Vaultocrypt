@@ -2,73 +2,86 @@
 
 import { revalidatePath } from "next/cache";
 import { AuditAction, AppRole as PrismaAppRole } from "@prisma/client";
+import { auth } from "@clerk/nextjs/server";
 
 import { writeAudit } from "@/lib/audit";
 import { getCurrentRole } from "@/lib/auth/get-role";
 import { prisma } from "@/lib/db";
 
-export type UserRow = {
+export type AdminRow = {
   id: string;
   email: string | null;
   firstName: string | null;
   lastName: string | null;
-  role: "ADMIN" | "USER";
   createdAt: Date;
+  isSelf: boolean;
 };
 
-export async function getUsers(): Promise<UserRow[]> {
+// ─── Queries ──────────────────────────────────────────────────────────────────
+
+export async function getAdmins(currentUserId: string | null): Promise<AdminRow[]> {
   const role = await getCurrentRole();
   if (role !== "ADMIN") return [];
 
-  const users = await prisma.user.findMany({
+  const admins = await prisma.user.findMany({
+    where: { role: "ADMIN" },
     orderBy: { createdAt: "asc" },
-    select: {
-      id: true,
-      email: true,
-      firstName: true,
-      lastName: true,
-      role: true,
-      createdAt: true,
-    },
+    select: { id: true, email: true, firstName: true, lastName: true, createdAt: true },
   });
 
-  return users.map((u) => ({
-    ...u,
-    role: u.role === "ADMIN" ? "ADMIN" : ("USER" as const),
-  }));
+  return admins.map((u) => ({ ...u, isSelf: u.id === currentUserId }));
 }
 
-export async function inviteUser(email: string, role: "ADMIN" | "USER") {
+// ─── Mutations ────────────────────────────────────────────────────────────────
+
+/** Add an admin by email — creates a stub if the user doesn't exist yet. */
+export async function addAdmin(email: string) {
   const callerRole = await getCurrentRole();
   if (callerRole !== "ADMIN") throw new Error("Unauthorized");
 
   const trimmed = email.trim().toLowerCase();
   if (!trimmed) throw new Error("Email is required.");
 
-  const existing = await prisma.user.findUnique({ where: { email: trimmed } });
-  if (existing) throw new Error("A team member with this email already exists.");
+  let user = await prisma.user.findUnique({ where: { email: trimmed } });
 
-  await prisma.user.create({
-    data: { email: trimmed, role: role as PrismaAppRole },
+  if (user) {
+    if (user.role === "ADMIN") throw new Error("This user is already an Admin.");
+    await prisma.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
+  } else {
+    user = await prisma.user.create({ data: { email: trimmed, role: "ADMIN" as PrismaAppRole } });
+  }
+
+  await writeAudit({
+    action: AuditAction.ROLE_CHANGED,
+    resource: "user",
+    resourceId: user.id,
+    metadata: { newRole: "ADMIN" },
   });
 
   revalidatePath("/settings");
 }
 
-export async function updateUserRole(userId: string, newRole: "ADMIN" | "USER") {
+/** Remove admin status from a user (demotes to USER). Cannot remove yourself. */
+export async function removeAdmin(userId: string) {
   const callerRole = await getCurrentRole();
   if (callerRole !== "ADMIN") throw new Error("Unauthorized");
 
+  const { userId: clerkUserId } = await auth();
+  if (clerkUserId) {
+    const self = await prisma.user.findUnique({ where: { clerkUserId }, select: { id: true } });
+    if (self?.id === userId) throw new Error("You cannot remove your own admin role.");
+  }
+
   await prisma.user.update({
     where: { id: userId },
-    data: { role: newRole as PrismaAppRole },
+    data: { role: "USER" as PrismaAppRole },
   });
 
   await writeAudit({
     action: AuditAction.ROLE_CHANGED,
     resource: "user",
     resourceId: userId,
-    metadata: { newRole },
+    metadata: { newRole: "USER" },
   });
 
   revalidatePath("/settings");

@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { TeamSettings } from "@/components/app/team-settings";
 import { ThemeToggle } from "@/components/app/theme-toggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getUsers } from "@/lib/actions/users";
+import { getAdmins } from "@/lib/actions/users";
 import { prisma } from "@/lib/db";
 
 async function getCurrentUserId(): Promise<string | null> {
@@ -22,7 +22,8 @@ async function getCurrentUserId(): Promise<string | null> {
 }
 
 export default async function SettingsPage() {
-  const [users, currentUserId] = await Promise.all([getUsers(), getCurrentUserId()]);
+  const currentUserId = await getCurrentUserId();
+  const admins = await getAdmins(currentUserId);
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -46,10 +47,10 @@ export default async function SettingsPage() {
           <div className="flex size-11 items-center justify-center rounded-[1.25rem] bg-muted">
             <Users className="size-4" />
           </div>
-          <CardTitle className="mt-3">Team</CardTitle>
+          <CardTitle className="mt-3">Admins</CardTitle>
         </CardHeader>
         <CardContent>
-          <TeamSettings users={users} currentUserId={currentUserId} />
+          <TeamSettings admins={admins} />
         </CardContent>
       </Card>
 

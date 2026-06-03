@@ -45,6 +45,12 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
   if (!project) notFound();
 
+  // Non-admins can only access projects in their assigned categories
+  if (role !== "ADMIN" && project.categoryId) {
+    const hasAccess = categories.some((c) => c.id === project.categoryId);
+    if (!hasAccess) notFound();
+  }
+
   const records = project.records.map((r) => ({
     id: r.id,
     title: r.title,

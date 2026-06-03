@@ -43,27 +43,43 @@ enum AuditAction {
 }
 
 model Category {
-  id        String    @id @default(cuid())
-  name      String
-  slug      String    @unique
-  isDefault Boolean   @default(false)
-  order     Int       @default(0)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  projects  Project[]
+  id         String           @id @default(cuid())
+  name       String
+  slug       String           @unique
+  isDefault  Boolean          @default(false)
+  order      Int              @default(0)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  projects   Project[]
+  userAccess CategoryAccess[]
+}
+
+model CategoryAccess {
+  id         String   @id @default(cuid())
+  categoryId String
+  userId     String
+  createdAt  DateTime @default(now())
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, userId])
+  @@index([userId])
+  @@index([categoryId])
 }
 
 model User {
-  id          String       @id @default(cuid())
-  clerkUserId String?      @unique
-  email       String?      @unique
-  firstName   String?
-  lastName    String?
-  role        AppRole      @default(USER)
-  isActive    Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  auditEvents AuditEvent[]
+  id             String           @id @default(cuid())
+  clerkUserId    String?          @unique
+  email          String?          @unique
+  firstName      String?
+  lastName       String?
+  role           AppRole          @default(USER)
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  auditEvents    AuditEvent[]
+  categoryAccess CategoryAccess[]
 }
 
 model Project {
