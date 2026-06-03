@@ -72,6 +72,29 @@ function buildCategoryRouting(
   return result;
 }
 
+// ─── Zoho SecretData parser ───────────────────────────────────────────────────
+// Zoho exports secrets as a multi-line block: "Key:Value\nKey:Value\n..."
+// e.g. "SecretType:Web Account\nUser Name:foo@bar.com\nPassword:abc123"
+
+function parseZohoSecretData(raw: string): { username: string; password: string } {
+  const result = { username: "", password: "" };
+  for (const line of raw.split(/\r?\n/)) {
+    const colon = line.indexOf(":");
+    if (colon === -1) continue;
+    const key = line.slice(0, colon).trim().toLowerCase().replace(/\s+/g, "");
+    const val = line.slice(colon + 1).trim();
+    if (key === "username" || key === "user" || key === "user name" || key.startsWith("user")) {
+      if (!result.username) result.username = val;
+    }
+    if (key === "password" || key === "pass") result.password = val;
+  }
+  return result;
+}
+
+function isZohoSecretBlock(value: string): boolean {
+  return value.includes("Password:") || value.includes("User Name:");
+}
+
 // ─── CSV rows → Client objects ────────────────────────────────────────────────
 
 function hostnameFrom(url: string): string {
@@ -111,16 +134,26 @@ function csvToClients(
   for (const [clientName, clientRows] of groups) {
     const records = clientRows.map((row) => {
       const url = pick(row, "record_url");
-      const secret = pick(row, "record_secret");
-      const type = secret ? "CREDENTIAL" : "SECURE_NOTE";
+      const rawSecret = pick(row, "record_secret");
+      let secretValue = rawSecret;
+      let username = pick(row, "record_username");
+
+      // Zoho SecretData is a structured block — extract real password + username
+      if (rawSecret && isZohoSecretBlock(rawSecret)) {
+        const parsed = parseZohoSecretData(rawSecret);
+        secretValue = parsed.password;
+        if (!username && parsed.username) username = parsed.username;
+      }
+
+      const type = secretValue ? "CREDENTIAL" : "SECURE_NOTE";
 
       return {
         title: pick(row, "record_title") || "Untitled record",
         type: type as "CREDENTIAL" | "SECURE_NOTE",
         serviceName: hostnameFrom(url) || clientName,
         url: url || undefined,
-        username: pick(row, "record_username") || undefined,
-        secretValue: secret || undefined,
+        username: username || undefined,
+        secretValue: secretValue || undefined,
         notes: pick(row, "record_notes") || undefined,
       };
     });
