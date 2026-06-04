@@ -55,7 +55,7 @@ export async function getRecords(projectId: string): Promise<RecordRow[]> {
 export async function revealSecret(recordId: string): Promise<string> {
   const record = await db.record.findUniqueOrThrow({
     where: { id: recordId },
-    select: { secretCipher: true, projectId: true },
+    select: { secretCipher: true, projectId: true, title: true },
   });
   await writeAudit({
     action: AuditAction.SECRET_REVEALED,
@@ -63,6 +63,7 @@ export async function revealSecret(recordId: string): Promise<string> {
     resourceId: recordId,
     projectId: record.projectId,
     recordId,
+    metadata: { recordTitle: record.title },
   });
   return record.secretCipher ? decrypt(record.secretCipher) : "";
 }
@@ -71,7 +72,7 @@ export async function revealSecret(recordId: string): Promise<string> {
 export async function copySecret(recordId: string): Promise<string> {
   const record = await db.record.findUniqueOrThrow({
     where: { id: recordId },
-    select: { secretCipher: true, projectId: true },
+    select: { secretCipher: true, projectId: true, title: true },
   });
   await writeAudit({
     action: AuditAction.SECRET_COPIED,
@@ -79,6 +80,7 @@ export async function copySecret(recordId: string): Promise<string> {
     resourceId: recordId,
     projectId: record.projectId,
     recordId,
+    metadata: { recordTitle: record.title },
   });
   return record.secretCipher ? decrypt(record.secretCipher) : "";
 }

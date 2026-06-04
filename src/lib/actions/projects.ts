@@ -82,8 +82,12 @@ export async function getProjectWithRecords(projectId: string) {
       },
       auditEvents: {
         orderBy: { createdAt: "desc" },
-        take: 20,
-        include: { actor: { select: { firstName: true, lastName: true, email: true } } },
+        take: 10,
+        include: {
+          actor: { select: { firstName: true, lastName: true, email: true } },
+          project: { select: { name: true } },
+          record: { select: { title: true } },
+        },
       },
     },
   });

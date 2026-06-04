@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { emitLiveAuditEvent } from "@/lib/audit-client";
 import type { CategoryWithProjects } from "@/lib/actions/categories";
 import { moveRecord } from "@/lib/actions/records";
 import { cn } from "@/lib/utils";
@@ -99,6 +100,7 @@ export function MoveRecordDialog({
     startTransition(async () => {
       try {
         await moveRecord(recordId, currentProjectId, selectedProjectId);
+        emitLiveAuditEvent({ action: "RECORD_UPDATED", targetLabel: recordTitle });
         router.refresh();
       } catch {
         setPendingMove(false);

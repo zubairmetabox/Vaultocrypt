@@ -38,6 +38,7 @@ import {
   revealSecret,
   updateRecord,
 } from "@/lib/actions/records";
+import { emitLiveAuditEvent } from "@/lib/audit-client";
 import type { CategoryWithProjects } from "@/lib/actions/categories";
 import type { RecordDraft, RecordFormInput } from "@/components/app/record-form-dialog";
 import { useSearch } from "@/contexts/search";
@@ -140,6 +141,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
     try {
       const secret = await revealSecret(record.id);
       setRevealedSecrets((prev) => new Map(prev).set(record.id, secret));
+      emitLiveAuditEvent({ action: "SECRET_REVEALED", targetLabel: record.title });
     } finally {
       setRevealingId(null);
     }
@@ -186,6 +188,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
     if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     setCopiedId(record.id);
     copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 2000);
+    emitLiveAuditEvent({ action: "SECRET_COPIED", targetLabel: record.title });
   }, []);
 
   async function handleOpenNote(record: RecordItem) {
@@ -209,6 +212,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
     try {
       const secret = await revealSecret(record.id);
       setRevealedSecrets((prev) => new Map(prev).set(record.id, secret));
+      emitLiveAuditEvent({ action: "SECRET_REVEALED", targetLabel: record.title });
       setOpenNote((current) =>
         current && current.id === record.id
           ? { ...current, content: secret, isLoading: false }
@@ -266,6 +270,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
               ? (draft.encryptNote ? undefined : draft.notes)
               : draft.notes,
         });
+        emitLiveAuditEvent({ action: "RECORD_CREATED", targetLabel: draft.title });
         setCreateOpen(false);
         router.refresh();
       } catch {
@@ -315,6 +320,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
               ? (draft.encryptNote ? "" : draft.notes)
               : draft.notes,
         });
+        emitLiveAuditEvent({ action: "RECORD_UPDATED", targetLabel: draft.title });
         setEditRecord(null);
         router.refresh();
       } catch {
@@ -340,6 +346,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
     startDelete(async () => {
       try {
         await deleteRecord(targetId, projectId);
+        emitLiveAuditEvent({ action: "RECORD_DELETED", targetLabel: snapshot?.title ?? deleteTarget.title });
         setDeleteTarget(null);
         router.refresh();
       } catch {

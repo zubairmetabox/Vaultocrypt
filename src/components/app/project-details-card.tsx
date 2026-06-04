@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { CategoryRow } from "@/lib/actions/categories";
+import { emitLiveAuditEvent } from "@/lib/audit-client";
 import { updateProject } from "@/lib/actions/projects";
 import { cn } from "@/lib/utils";
 
@@ -135,6 +136,7 @@ export function ProjectDetailsCard({
           status: draft.status === "Active" ? "ACTIVE" : "INACTIVE",
           categoryId: draftCategoryId || undefined,
         });
+        emitLiveAuditEvent({ action: "CLIENT_UPDATED", targetLabel: draft.name });
         setDetails(draft);
         setActiveCategoryId(draftCategoryId || null);
         setEditOpen(false);
@@ -161,6 +163,7 @@ export function ProjectDetailsCard({
     startMoveTransition(async () => {
       try {
         await updateProject(projectId, { categoryId: newCatId });
+        emitLiveAuditEvent({ action: "CLIENT_UPDATED", targetLabel: details.name });
         router.refresh();
       } catch {
         setPendingCategoryId(null);
