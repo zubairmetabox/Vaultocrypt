@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import { redirect } from "next/navigation";
 import { WorkspaceShell } from "@/components/app/workspace-shell";
 import { getCategories } from "@/lib/actions/categories";
 import { getCurrentRole } from "@/lib/auth/get-role";
@@ -14,6 +15,8 @@ export default async function WorkspaceLayout({
   );
 
   const [categories, role] = await Promise.all([getCategories(), getCurrentRole()]);
+
+  if (role === "NONE") redirect("/no-access");
 
   return (
     <WorkspaceShell clerkEnabled={clerkEnabled} categories={categories} role={role}>

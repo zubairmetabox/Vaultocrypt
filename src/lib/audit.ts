@@ -30,7 +30,7 @@ async function resolveActorId(): Promise<string | null> {
       });
 
       if (stub) {
-        // Link the stub to this Clerk account on first sign-in
+        // Link the stub to this Clerk account on first action
         await prisma.user.update({
           where: { id: stub.id },
           data: { clerkUserId, firstName: clerkUser.firstName, lastName: clerkUser.lastName },
@@ -39,20 +39,9 @@ async function resolveActorId(): Promise<string | null> {
       }
     }
 
-    if (!user) {
-      // 3. No record found — create a new one
-      user = await prisma.user.create({
-        data: {
-          clerkUserId,
-          email: primaryEmail,
-          firstName: clerkUser.firstName,
-          lastName: clerkUser.lastName,
-        },
-        select: { id: true },
-      });
-    }
-
-    return user.id;
+    // Do NOT auto-create users here — only admins can add users to the system.
+    // Access control is enforced in getCurrentRole().
+    return user?.id ?? null;
   } catch {
     return null;
   }

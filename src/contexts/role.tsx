@@ -4,7 +4,7 @@ import { createContext, useContext } from "react";
 
 import type { AppRole } from "@/lib/auth/get-role";
 
-const RoleContext = createContext<AppRole>("USER");
+const RoleContext = createContext<AppRole>("NONE");
 
 export function RoleProvider({
   role,
