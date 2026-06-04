@@ -14,6 +14,7 @@ import {
   Loader2,
   Plus,
   Settings2,
+  Share2,
 } from "lucide-react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { useRole } from "@/contexts/role";
@@ -169,9 +170,10 @@ export function Sidebar({ pathname, categories, pendingCategoryIds = [] }: Sideb
         {/* ── Bottom nav ──────────────────────────────────────────────────── */}
         <div className="mt-auto space-y-1 pt-2">
           {[
-            { href: "/activity", label: "Activity", icon: Activity },
-            { href: "/settings", label: "Settings", icon: Settings2 },
-          ].map((item) => {
+            { href: "/sharing", label: "Sharing", icon: Share2, adminOnly: false },
+            { href: "/activity", label: "Activity", icon: Activity, adminOnly: true },
+            { href: "/settings", label: "Settings", icon: Settings2, adminOnly: false },
+          ].filter((item) => !item.adminOnly || role === "ADMIN").map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href;
             return (

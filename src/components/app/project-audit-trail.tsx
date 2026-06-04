@@ -48,6 +48,9 @@ const ACTION_META: Record<
   FAILED_LOGIN: { label: "failed sign-in", icon: AlertTriangle, tone: "destructive" },
   ROLE_CHANGED: { label: "changed role", icon: PencilLine, tone: "outline" },
   RESTRICTION_CHANGED: { label: "changed restriction", icon: ShieldCheck, tone: "outline" },
+  SHARE_CREATED: { label: "created share link", icon: ArrowRightLeft, tone: "outline" },
+  SHARE_REVEALED: { label: "share secret revealed", icon: Eye, tone: "secondary" },
+  SHARE_EXPIRED: { label: "expired share link", icon: ShieldCheck, tone: "destructive" },
 };
 
 function formatUpdated(date: Date): string {

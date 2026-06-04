@@ -15,14 +15,17 @@ import {
   Loader2,
   PencilLine,
   Plus,
+  Share2,
   Trash2,
 } from "lucide-react";
 
 import { MoveRecordDialog } from "@/components/app/move-record-dialog";
 import { RecordFormDialog } from "@/components/app/record-form-dialog";
+import { ShareModal } from "@/components/app/share-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -115,6 +118,8 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [moveTarget, setMoveTarget] = useState<{ id: string; title: string } | null>(null);
   const [openNote, setOpenNote] = useState<OpenNoteState>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [shareOpen, setShareOpen] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function handleReveal(record: RecordItem) {
@@ -356,6 +361,23 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
     });
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === displayRecords.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(displayRecords.map((r) => r.id)));
+    }
+  }
+
   const isSearching = query.length >= 3;
   const displayRecords = isSearching
     ? records.filter((r) => {
@@ -372,11 +394,21 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
     <>
       <Card className="border-border/70 bg-card/95">
         <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <div className="space-y-1">
-            <CardTitle>Records / Notes</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Credentials stay structured. Notes feel lighter and faster to scan.
-            </p>
+          <div className="flex items-center gap-3">
+            {displayRecords.length > 0 && (
+              <Checkbox
+                checked={selectedIds.size === displayRecords.length && displayRecords.length > 0}
+                onCheckedChange={toggleSelectAll}
+                aria-label="Select all records"
+                className="shrink-0"
+              />
+            )}
+            <div className="space-y-1">
+              <CardTitle>Records / Notes</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Credentials stay structured. Notes feel lighter and faster to scan.
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -430,16 +462,27 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
               const canServerReveal = !isNote || record.hasEncryptedContent;
               const secretDisplay = isRevealed ? (secret || "—") : "•".repeat(18);
 
+              const isSelected = selectedIds.has(record.id);
+
               return (
                 <div
                   key={record.id}
                   className={
                     isNote
-                      ? "rounded-[1.5rem] border border-amber-200/10 bg-[linear-gradient(180deg,rgba(245,158,11,0.12),rgba(15,23,42,0.96))] p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-                      : "rounded-[1.5rem] border border-border/70 bg-background/95 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                      ? `rounded-[1.5rem] border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${isSelected ? "border-primary/50 bg-[linear-gradient(180deg,rgba(245,158,11,0.16),rgba(15,23,42,0.98))]" : "border-amber-200/10 bg-[linear-gradient(180deg,rgba(245,158,11,0.12),rgba(15,23,42,0.96))]"}`
+                      : `rounded-[1.5rem] border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${isSelected ? "border-primary/50 bg-accent/30" : "border-border/70 bg-background/95"}`
                   }
                 >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex items-start gap-3">
+                    {!isOptimistic && (
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelect(record.id)}
+                        aria-label={`Select ${record.title}`}
+                        className="mt-1 shrink-0"
+                      />
+                    )}
+                  <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 flex-1 space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2">
                         <div
@@ -638,6 +681,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                       )}
                     </div>
                   </div>
+                  </div>
                 </div>
               );
             })
@@ -714,6 +758,36 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Floating share bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
+          <div className="flex items-center gap-3 rounded-2xl border border-border/80 bg-card/95 px-4 py-3 shadow-2xl shadow-slate-950/40 backdrop-blur-md">
+            <span className="text-sm font-medium text-foreground">
+              {selectedIds.size} {selectedIds.size === 1 ? "record" : "records"} selected
+            </span>
+            <Button size="sm" variant="outline" onClick={() => setSelectedIds(new Set())}>
+              Clear
+            </Button>
+            <Button size="sm" onClick={() => setShareOpen(true)}>
+              <Share2 className="size-4" />
+              Share
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <ShareModal
+        open={shareOpen}
+        onOpenChange={(open) => {
+          setShareOpen(open);
+          if (!open) setSelectedIds(new Set());
+        }}
+        projectId={projectId}
+        selectedRecords={records
+          .filter((r) => selectedIds.has(r.id))
+          .map((r) => ({ id: r.id, title: r.title, type: r.type }))}
+      />
 
       {categories && moveTarget && (
         <MoveRecordDialog

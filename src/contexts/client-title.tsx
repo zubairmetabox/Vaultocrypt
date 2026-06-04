@@ -1,24 +1,27 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 
-// Renamed internals to "project" — file kept at same path for backwards compat
-const ProjectTitleContext = createContext<string | null>(null);
+type TitleCtx = {
+  title: string | null;
+  setTitle: (t: string | null) => void;
+};
 
-export function ClientTitleProvider({
-  name,
-  children,
-}: {
-  name: string;
-  children: React.ReactNode;
-}) {
+const ClientTitleContext = createContext<TitleCtx>({
+  title: null,
+  setTitle: () => {},
+});
+
+export function ClientTitleProvider({ children }: { children: ReactNode }) {
+  const [title, setTitleState] = useState<string | null>(null);
+  const setTitle = useCallback((t: string | null) => setTitleState(t), []);
   return (
-    <ProjectTitleContext.Provider value={name}>
+    <ClientTitleContext.Provider value={{ title, setTitle }}>
       {children}
-    </ProjectTitleContext.Provider>
+    </ClientTitleContext.Provider>
   );
 }
 
 export function useClientTitle() {
-  return useContext(ProjectTitleContext);
+  return useContext(ClientTitleContext);
 }

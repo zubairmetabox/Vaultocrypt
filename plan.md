@@ -6,7 +6,7 @@ Vaultocrypt v1 is an internal-only web app for MetaBox Technology to manage proj
 
 The goal of v1 is not public SaaS readiness. The goal is real weekly internal usage by the MetaBox team with strong security defaults, clean UX, and a practical operational foundation.
 
-Current state note (as of 2026-06-03):
+Current state note (as of 2026-06-04):
 - Core data flows are wired to the real Neon/Postgres database (projects, records, categories, import)
 - `src/lib/mock-data.ts` deleted — `RecordItem` and `RecordFormInput` defined in component layer
 - Import is wired end-to-end: CSV → dialog → `importClients` server action → DB
@@ -20,6 +20,7 @@ Current state note (as of 2026-06-03):
 - Settings > Admins: add/remove admins by email; Clerk name lookup pre-fills name on add
 - Migration tooling complete: import parses Zoho SecretData blocks, auto-routes folders to categories, shows loader; Export all (Admin-only) decrypts every secret into a full CSV for round-trip verification
 - Record cards redesigned: URL and Username shown as labeled rows; URL is a clickable link
+- **June 4**: Sidebar client list: collapsible panel with toggle button, alphabetical sort, active-client highlight, auto-opens on `/` and `/clients/[id]` routes, custom sleek scrollbar; client-page header replaced with breadcrumbs (Clients / Client Name linking back to directory); Records and access eyebrow removed from client pages; commit 17d8815
 
 ## Product Rules
 
@@ -85,6 +86,7 @@ Current state note (as of 2026-06-03):
 - [x] Add empty states for first-use flows
 - [x] Add polished page framing and state transitions
 - [x] Dynamic category sections in sidebar with expand/collapse and optimistic add
+- [x] Collapsible client list in sidebar with toggle button, alphabetical sort, active-client highlight, auto-open on client routes, custom scrollbar
 
 ### Deliverables
 
@@ -92,6 +94,7 @@ Current state note (as of 2026-06-03):
 - [x] Responsive navigation
 - [x] Placeholder pages for all primary sections
 - [x] Sidebar auto-opens the active category section
+- [x] Sidebar client list styled as a distinct panel, scrollable, active state highlighted
 
 ## Phase 3: Authentication And Roles
 
@@ -154,7 +157,7 @@ Current state note (as of 2026-06-03):
 ### Deliverables
 
 - [x] Usable project directory backed by real DB
-- [x] Project detail page structure
+- [x] Project detail page structure with breadcrumb header (Clients / Client Name) replacing plain title
 - [x] Project creation and editing flows (real DB)
 - [x] Project detail audit sidebar with aligned dashboard layout
 - [x] Selectable project directory with bulk export, move, and delete actions
@@ -302,7 +305,7 @@ Any new feature must satisfy all of them before it is considered done.
 - [x] Project directory — empty state with CTA to add first project.
 - [x] Record list — empty state with CTA to add first record.
 - [x] Category sidebar section — "No projects yet" when a category has no projects.
-- [x] Activity page — empty state when no audit events exist yet.
+- [x] Activity page — empty state when no audit events exist yet (admin-only; filtered empty state with Clear filters CTA).
 - [x] Search results — empty state when no matches found (both directory and record list).
 
 ### Feedback Patterns
@@ -328,7 +331,103 @@ Any new feature must satisfy all of them before it is considered done.
 
 ---
 
-## Phase 9: Ops Readiness
+## Phase 9: Client Sharing
+
+### Overview
+
+Any authenticated user can select individual records or secure notes within a single project and generate a shareable link. The recipient accesses the link via a public page (no Vaultocrypt account required), enters the share password to unlock it, and sees the selected records with secrets hidden behind per-record Reveal buttons. Links expire at a user-chosen time and can be manually expired at any time by the creator.
+
+### Data Model
+
+- New `SharedBundle` table:
+  - `id` — cuid, primary key (used as the URL token)
+  - `createdById` — FK to the Clerk user who created it
+  - `projectId` — FK to the project the records belong to
+  - `recordIds` — `String[]` array of record IDs included in the bundle
+  - `passwordCipher` — AES-256-GCM encrypted form of the 12-char generated password (same key as record secrets; allows retrieval by the creator)
+  - `expiresAt` — `DateTime`, nullable (null = never expires)
+  - `expiredManually` — `Boolean`, default false
+  - `createdAt` — `DateTime`
+- No secrets stored in `SharedBundle` — secrets are fetched and decrypted on-demand per-reveal, exactly like the main app
+
+### Sharing Flow (creator side)
+
+1. User selects one or more records on the project page using per-record checkboxes (checkbox appears on hover/focus; a "select all" checkbox in the list header).
+2. A floating action bar appears at the bottom of the record list when ≥1 record is selected, showing a **Share** button (and a count).
+3. Clicking Share opens a modal that shows:
+   - List of selected records (title + type icon, non-editable)
+   - Expiry dropdown: **1 hour**, **24 hours**, **7 days**, **30 days**, **Never**
+   - A **Share** button
+4. On Share click:
+   - Server action generates a cryptographically random 12-char strong password (upper + lower + digits + symbols, no ambiguous chars)
+   - Password is encrypted with `VAULT_ENCRYPTION_KEY` (AES-256-GCM) and stored as `passwordCipher` in `SharedBundle`
+   - Returns the `id` (URL token) and the plain password
+5. Modal transitions to a **success state** showing:
+   - Copyable share URL (`/share/[id]`)
+   - Copyable password (masked with a reveal toggle)
+   - Expiry reminder
+   - A **Done** button to close
+
+### Shared Page (recipient side)
+
+- Route: `/share/[id]` — fully public, no Clerk auth required
+- If the bundle is expired (by date or manually): show a clean "This link has expired" screen
+- Otherwise: show a password entry screen
+- On correct password entry: show the record list with secrets hidden behind per-record **Reveal** buttons
+- Reveal calls a server action that verifies the bundle is still valid, then decrypts and returns the secret for that record only
+- Page is not indexable (`noindex`) and has no app shell (minimal branded layout)
+
+### Sidebar — Sharing Section
+
+- New sidebar entry **Sharing** above **Activity**
+- Route: `/sharing`
+- Lists all bundles created by the current user (or all bundles for Admins)
+- Each row shows: project name, record count, created date, expiry, status badge (**Active** / **Expired**)
+- Active and expired shown in separate sections (Active first)
+- Clicking a row navigates to `/sharing/[bundleId]` — individual page mirroring the project page layout:
+  - **Details card**: copyable URL, masked/copyable password, expiry, Expire now button (destructive confirm)
+  - **Records card**: read-only list of included records (title, type, service/URL, username)
+  - **Audit trail** (right rail, polls every 10s): SHARE_CREATED, every SHARE_REVEALED (record title + IP + parsed browser/OS behind info-icon toggle), SHARE_EXPIRED
+  - Breadcrumb: Sharing / Project Name (via ClientTitleContext)
+
+### Audit
+
+- `SHARE_CREATED` event when a bundle is created (records IDs and expiry logged)
+- `SHARE_REVEALED` event when a recipient reveals a secret on the shared page (bundle id + record id + requester IP + user-agent logged)
+- `SHARE_EXPIRED` event when manually expired
+
+### Tasks
+
+- [x] Add `SharedBundle` model to Prisma schema and push migration
+- [x] Build per-record checkboxes and floating action bar on project page
+- [x] Build Share modal (selected records list + expiry dropdown + Share button)
+- [x] Server action: `createSharedBundle` — generate 12-char strong password, AES-256-GCM encrypt, persist, return URL + plain password
+- [x] Modal success state: copyable URL + copyable password (masked, reveal toggle)
+- [x] Public route `/share/[id]` with expired / password-gate / record-list states
+- [x] Expiry warning banner on shared page (days/hours/minutes countdown)
+- [x] 10-second polling on shared page — evicts recipient immediately on expire
+- [x] Server action: `verifySharePassword` — decrypt `passwordCipher`, constant-time compare, return bundle metadata if valid
+- [x] Server action: `revealSharedSecret` — validates bundle active on every call, decrypts, logs IP + user-agent
+- [x] Add **Sharing** sidebar link above Activity
+- [x] Build `/sharing` page: active + expired bundle list, click navigates to detail page
+- [x] Build `/sharing/[bundleId]` individual page (details card + records card + audit trail)
+- [x] Write audit events for SHARE_CREATED, SHARE_REVEALED, SHARE_EXPIRED
+- [x] Access scoping: personal category bundles visible to creator only; team bundles to admins + creator
+- [x] Audit trail polls every 10s for live updates without page reload
+- [x] Audit trail access info: IP + parsed browser/OS behind info-icon toggle
+
+### Deliverables
+
+- [x] Any user can select records in a project and generate a share link + password
+- [x] Recipients can access shared records on a public page without a Vaultocrypt account
+- [x] Secrets on the shared page are hidden behind per-record Reveal buttons
+- [x] Links expire automatically or can be manually expired
+- [x] Sharing sidebar shows all bundles with active/expired state
+- [x] Activity page: admin-only, type filter chips, user dropdown, shadcn date range picker
+
+---
+
+## Phase 10: Ops Readiness (was Phase 9)
 
 ### Tasks
 
@@ -345,7 +444,7 @@ Any new feature must satisfy all of them before it is considered done.
 - [ ] Production-readiness checklist
 - [ ] Safer deployment baseline
 
-## Phase 10: Manual Rollout
+## Phase 11: Manual Rollout
 
 ### Tasks
 

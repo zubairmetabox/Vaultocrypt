@@ -31,6 +31,7 @@ import {
 import { moveProjects } from "@/lib/actions/projects";
 import { SearchProvider, useSearch } from "@/contexts/search";
 import { RoleProvider } from "@/contexts/role";
+import { ClientTitleProvider, useClientTitle } from "@/contexts/client-title";
 import type { AppRole } from "@/lib/auth/get-role";
 import type { CategoryWithProjects } from "@/lib/actions/categories";
 
@@ -51,9 +52,11 @@ export function WorkspaceShell({ children, clerkEnabled, categories, role }: Wor
   return (
     <RoleProvider role={role}>
       <SearchProvider>
-        <WorkspaceShellInner clerkEnabled={clerkEnabled} categories={categories} role={role}>
-          {children}
-        </WorkspaceShellInner>
+        <ClientTitleProvider>
+          <WorkspaceShellInner clerkEnabled={clerkEnabled} categories={categories} role={role}>
+            {children}
+          </WorkspaceShellInner>
+        </ClientTitleProvider>
       </SearchProvider>
     </RoleProvider>
   );
@@ -65,6 +68,7 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
   const [isPending, startTransition] = useTransition();
   const [activeDrag, setActiveDrag] = useState<{ projectName: string } | null>(null);
   const [pendingCategoryIds, setPendingCategoryIds] = useState<string[]>([]);
+  const { title: dynamicTitle } = useClientTitle();
 
   // Clear pending loaders once the refreshed categories prop arrives (UI updated)
   useEffect(() => {
@@ -127,16 +131,20 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
     ? categories.find((c) => c.id === activeCategoryId)
     : null;
 
+  const isBundleDetailPage = /^\/sharing\/[^/]+$/.test(pathname);
+
   let currentPage: { title: string; eyebrow?: string };
   if (activeProject) {
     currentPage = { title: activeProject.name };
   } else if (activeCategory) {
     currentPage = { title: activeCategory.name };
+  } else if (isBundleDetailPage) {
+    currentPage = { title: dynamicTitle ?? "Share link" };
   } else {
     currentPage = staticPageMeta[pathname] ?? staticPageMeta["/"];
   }
 
-  const showBreadcrumb = Boolean(activeProject);
+  const showBreadcrumb = Boolean(activeProject) || isBundleDetailPage;
 
   return (
     <DndContext id="workspace-dnd" sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -193,10 +201,18 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
                   {showBreadcrumb ? (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Link
-                        href={activeProjectCategory ? `/categories/${activeProjectCategory.id}` : "/"}
+                        href={
+                          isBundleDetailPage
+                            ? "/sharing"
+                            : activeProjectCategory
+                              ? `/categories/${activeProjectCategory.id}`
+                              : "/"
+                        }
                         className="transition-colors duration-200 hover:text-foreground"
                       >
-                        {activeProjectCategory?.name ?? "Projects"}
+                        {isBundleDetailPage
+                          ? "Sharing"
+                          : (activeProjectCategory?.name ?? "Projects")}
                       </Link>
                       <span>/</span>
                       <span className="text-foreground">{currentPage.title}</span>

@@ -40,6 +40,9 @@ enum AuditAction {
   SECRET_COPIED
   ROLE_CHANGED
   RESTRICTION_CHANGED
+  SHARE_CREATED
+  SHARE_REVEALED
+  SHARE_EXPIRED
 }
 
 model Category {
@@ -85,23 +88,25 @@ model User {
   auditEvents        AuditEvent[]
   categoryAccess     CategoryAccess[]
   personalCategories Category[]       @relation("PersonalCategories")
+  sharedBundles      SharedBundle[]
 }
 
 model Project {
-  id           String        @id @default(cuid())
+  id           String         @id @default(cuid())
   name         String
   contact      String?
   vertical     String?
   notes        String?
-  status       ClientStatus  @default(ACTIVE)
+  status       ClientStatus   @default(ACTIVE)
   categoryId   String?
-  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  isRestricted Boolean       @default(false)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  category     Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  isRestricted Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
   records      Record[]
-  tags         Tag[]         @relation("ClientTags")
+  tags         Tag[]          @relation("ClientTags")
   auditEvents  AuditEvent[]
+  sharedBundles SharedBundle[]
 
   @@index([categoryId])
   @@map("Client")
@@ -157,4 +162,21 @@ model AuditEvent {
   @@index([actorId])
   @@index([projectId], map: "AuditEvent_clientId_idx")
   @@index([recordId])
+}
+
+model SharedBundle {
+  id              String    @id @default(cuid())
+  createdById     String
+  projectId       String
+  recordIds       String[]
+  passwordCipher  String
+  expiresAt       DateTime?
+  expiredManually Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+
+  createdBy User    @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([createdById])
+  @@index([projectId])
 }
