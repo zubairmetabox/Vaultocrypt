@@ -48,10 +48,14 @@ model Category {
   slug       String           @unique
   isDefault  Boolean          @default(false)
   order      Int              @default(0)
+  ownerId    String?
+  owner      User?            @relation("PersonalCategories", fields: [ownerId], references: [id], onDelete: Cascade)
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
   projects   Project[]
   userAccess CategoryAccess[]
+
+  @@index([ownerId])
 }
 
 model CategoryAccess {
@@ -78,8 +82,9 @@ model User {
   isActive       Boolean          @default(true)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
-  auditEvents    AuditEvent[]
-  categoryAccess CategoryAccess[]
+  auditEvents        AuditEvent[]
+  categoryAccess     CategoryAccess[]
+  personalCategories Category[]       @relation("PersonalCategories")
 }
 
 model Project {

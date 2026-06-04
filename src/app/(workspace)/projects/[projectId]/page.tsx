@@ -45,8 +45,9 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
   if (!project) notFound();
 
-  // Non-admins can only access projects in their assigned categories
-  if (role !== "ADMIN" && project.categoryId) {
+  // Everyone (including Admins) must have the project's category in their getCategories() result.
+  // This enforces personal category privacy — getCategories() never returns another user's personal.
+  if (project.categoryId) {
     const hasAccess = categories.some((c) => c.id === project.categoryId);
     if (!hasAccess) notFound();
   }

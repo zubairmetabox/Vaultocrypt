@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { AuditAction, ClientStatus } from "@prisma/client";
 
 import { writeAudit } from "@/lib/audit";
+import { getAccessibleCategoryIds } from "@/lib/actions/categories";
+import { getCurrentRole } from "@/lib/auth/get-role";
 import { prisma as db } from "@/lib/db";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -24,7 +26,11 @@ export type ProjectRow = {
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export async function getProjects(): Promise<ProjectRow[]> {
+  const accessibleCategoryIds = await getAccessibleCategoryIds();
+  if (accessibleCategoryIds.length === 0) return [];
+
   const rows = await db.project.findMany({
+    where: { categoryId: { in: accessibleCategoryIds } },
     orderBy: { name: "asc" },
     select: {
       id: true,
@@ -53,7 +59,8 @@ export async function getProjectName(projectId: string): Promise<string | null> 
 }
 
 export async function getProjectWithRecords(projectId: string) {
-  return db.project.findUnique({
+  const accessibleCategoryIds = await getAccessibleCategoryIds();
+  const project = await db.project.findUnique({
     where: { id: projectId },
     include: {
       records: {
@@ -79,9 +86,13 @@ export async function getProjectWithRecords(projectId: string) {
       },
     },
   });
+
+  if (!project?.categoryId) return project;
+  return accessibleCategoryIds.includes(project.categoryId) ? project : null;
 }
 
 export async function getInternalProjects() {
+  const accessibleCategoryIds = await getAccessibleCategoryIds();
   const internal = await db.category.findUnique({
     where: { slug: "internal" },
     include: {
@@ -108,6 +119,7 @@ export async function getInternalProjects() {
       },
     },
   });
+  if (!internal || !accessibleCategoryIds.includes(internal.id)) return [];
   return internal?.projects ?? [];
 }
 
@@ -121,6 +133,12 @@ export type CreateProjectInput = {
 };
 
 export async function createProject(input: CreateProjectInput) {
+  const accessibleCategoryIds = await getAccessibleCategoryIds();
+  if (!input.categoryId) throw new Error("Category is required.");
+  if (!accessibleCategoryIds.includes(input.categoryId)) {
+    throw new Error("Unauthorized");
+  }
+
   const project = await db.project.create({
     data: {
       name: input.name.trim(),
@@ -149,6 +167,20 @@ export type UpdateProjectInput = {
 };
 
 export async function updateProject(projectId: string, input: UpdateProjectInput) {
+  const accessibleCategoryIds = await getAccessibleCategoryIds();
+  const existing = await db.project.findUnique({
+    where: { id: projectId },
+    select: { categoryId: true },
+  });
+
+  if (!existing) throw new Error("Project not found.");
+  if (existing.categoryId && !accessibleCategoryIds.includes(existing.categoryId)) {
+    throw new Error("Unauthorized");
+  }
+  if (input.categoryId !== undefined && !accessibleCategoryIds.includes(input.categoryId)) {
+    throw new Error("Unauthorized");
+  }
+
   const project = await db.project.update({
     where: { id: projectId },
     data: {
@@ -172,6 +204,16 @@ export async function updateProject(projectId: string, input: UpdateProjectInput
 }
 
 export async function deleteProjects(projectIds: string[]) {
+  const role = await getCurrentRole();
+  const accessibleCategoryIds = await getAccessibleCategoryIds();
+  if (role !== "ADMIN") throw new Error("Unauthorized");
+
+  const ownedProjects = await db.project.findMany({
+    where: { id: { in: projectIds }, categoryId: { in: accessibleCategoryIds } },
+    select: { id: true },
+  });
+  if (ownedProjects.length !== projectIds.length) throw new Error("Unauthorized");
+
   await Promise.all(
     projectIds.map((id) =>
       writeAudit({ action: AuditAction.CLIENT_DELETED, resource: "project", resourceId: id }),
@@ -182,6 +224,17 @@ export async function deleteProjects(projectIds: string[]) {
 }
 
 export async function moveProjects(projectIds: string[], categoryId: string) {
+  const role = await getCurrentRole();
+  const accessibleCategoryIds = await getAccessibleCategoryIds();
+  if (role !== "ADMIN") throw new Error("Unauthorized");
+  if (!accessibleCategoryIds.includes(categoryId)) throw new Error("Unauthorized");
+
+  const ownedProjects = await db.project.findMany({
+    where: { id: { in: projectIds }, categoryId: { in: accessibleCategoryIds } },
+    select: { id: true },
+  });
+  if (ownedProjects.length !== projectIds.length) throw new Error("Unauthorized");
+
   await db.project.updateMany({
     where: { id: { in: projectIds } },
     data: { categoryId },

@@ -20,7 +20,7 @@ export async function getCurrentRole(): Promise<AppRole> {
       const clerkUser = await currentUser();
       const primaryEmail =
         clerkUser?.emailAddresses.find(
-          (e) => e.id === clerkUser.primaryEmailAddressId,
+          (emailAddress) => emailAddress.id === clerkUser.primaryEmailAddressId,
         )?.emailAddress ?? null;
 
       if (primaryEmail) {
@@ -28,6 +28,7 @@ export async function getCurrentRole(): Promise<AppRole> {
           where: { email: primaryEmail, clerkUserId: null },
           select: { id: true, role: true },
         });
+
         if (stub) {
           await prisma.user.update({
             where: { id: stub.id },
@@ -41,17 +42,18 @@ export async function getCurrentRole(): Promise<AppRole> {
         }
       }
 
-      // 3. Bootstrap: no admins exist yet — make this user the first admin
+      // 3. Bootstrap: no admins exist yet - make this user the first admin
       if (!user) {
         const adminCount = await prisma.user.count({ where: { role: "ADMIN" } });
+
         if (adminCount === 0) {
           const clerkUser2 = clerkUser ?? (await currentUser());
           const email =
             clerkUser2?.emailAddresses.find(
-              (e) => e.id === clerkUser2.primaryEmailAddressId,
+              (emailAddress) => emailAddress.id === clerkUser2.primaryEmailAddressId,
             )?.emailAddress ?? null;
 
-          await prisma.user.create({
+          user = await prisma.user.create({
             data: {
               clerkUserId,
               email,
@@ -59,12 +61,12 @@ export async function getCurrentRole(): Promise<AppRole> {
               lastName: clerkUser2?.lastName ?? null,
               role: "ADMIN",
             },
+            select: { id: true, role: true },
           });
-          return "ADMIN";
         }
 
-        // Admins exist but this person was never invited — block them
-        return "NONE";
+        // Admins exist but this person was never invited - block them
+        if (!user) return "NONE";
       }
     }
 
@@ -73,9 +75,21 @@ export async function getCurrentRole(): Promise<AppRole> {
       const adminCount = await prisma.user.count({ where: { role: "ADMIN" } });
       if (adminCount === 0) {
         await prisma.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
-        return "ADMIN";
+        user = { ...user, role: "ADMIN" };
       }
     }
+
+    // Ensure this user has a personal category (silent, one-time)
+    await prisma.category.upsert({
+      where: { slug: `personal-${user.id}` },
+      create: {
+        name: "Personal",
+        slug: `personal-${user.id}`,
+        ownerId: user.id,
+        order: 999,
+      },
+      update: {},
+    });
 
     return user.role === "ADMIN" ? "ADMIN" : "USER";
   } catch {

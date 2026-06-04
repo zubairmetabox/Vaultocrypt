@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { ClientStatus, RecordType } from "@prisma/client";
 
+import { getAccessibleCategoryIds } from "@/lib/actions/categories";
+import { getCurrentRole } from "@/lib/auth/get-role";
 import { encrypt } from "@/lib/crypto";
 import { prisma as db } from "@/lib/db";
 
@@ -27,16 +29,24 @@ export type ImportProjectInput = {
 export type ImportClientInput = ImportProjectInput;
 
 export async function importProjects(projects: ImportProjectInput[]) {
+  const role = await getCurrentRole();
+  const accessibleCategoryIds = await getAccessibleCategoryIds();
+  if (role !== "ADMIN") throw new Error("Unauthorized");
+
   let projectCount = 0;
   let recordCount = 0;
 
   for (const p of projects) {
+    if (!p.categoryId || !accessibleCategoryIds.includes(p.categoryId)) {
+      throw new Error("Unauthorized category.");
+    }
+
     const created = await db.project.create({
       data: {
         name: p.name.trim(),
         contact: p.contact?.trim() || null,
         vertical: p.vertical?.trim() || null,
-        categoryId: p.categoryId ?? null,
+        categoryId: p.categoryId,
         status: (p.status as ClientStatus) ?? ClientStatus.ACTIVE,
         records: {
           create: p.records.map((r) => ({

@@ -216,6 +216,7 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
                     categoryId={activeCategory.id}
                     categoryName={activeCategory.name}
                     isDefault={activeCategory.isDefault}
+                    isPersonal={activeCategory.isPersonal}
                     projectCount={activeCategory.projects.length}
                   />
                 )}

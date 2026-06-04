@@ -22,6 +22,7 @@ export async function exportAllRecords(): Promise<string> {
   if (role !== "ADMIN") throw new Error("Unauthorized");
 
   const categories = await prisma.category.findMany({
+    where: { ownerId: null }, // exclude personal categories
     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
     include: {
       projects: {

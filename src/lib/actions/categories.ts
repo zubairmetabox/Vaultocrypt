@@ -14,6 +14,7 @@ export type CategoryRow = {
   name: string;
   slug: string;
   isDefault: boolean;
+  isPersonal: boolean;
   order: number;
 };
 
@@ -42,7 +43,7 @@ async function ensureDefaults() {
 }
 
 async function migrateOrphans() {
-  const clientsCategory = await db.category.findUnique({ where: { slug: "clients" } });
+  const clientsCategory = await db.category.findFirst({ where: { slug: "clients", ownerId: null } });
   if (!clientsCategory) return;
   await db.project.updateMany({
     where: { categoryId: null },
@@ -50,31 +51,51 @@ async function migrateOrphans() {
   });
 }
 
+export async function getCurrentDbUserId() {
+  const { userId: clerkUserId } = await auth();
+  if (!clerkUserId) return null;
+
+  const user = await db.user.findUnique({
+    where: { clerkUserId },
+    select: { id: true },
+  });
+
+  return user?.id ?? null;
+}
+
+export async function getAccessibleCategoryIds(): Promise<string[]> {
+  const role = await getCurrentRole();
+  const currentUserId = await getCurrentDbUserId();
+
+  if (!currentUserId) return [];
+
+  const rows = await db.category.findMany({
+    where:
+      role === "ADMIN"
+        ? {
+            OR: [{ ownerId: null }, { ownerId: currentUserId }],
+          }
+        : {
+            OR: [
+              { ownerId: currentUserId },
+              { ownerId: null, userAccess: { some: { userId: currentUserId } } },
+            ],
+          },
+    select: { id: true },
+  });
+
+  return rows.map((row) => row.id);
+}
+
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export async function getCategories(): Promise<CategoryWithProjects[]> {
   await ensureDefaults();
   await migrateOrphans();
-
-  const role = await getCurrentRole();
-  let accessibleCategoryIds: string[] | null = null;
-
-  if (role !== "ADMIN") {
-    // Non-admins: only return categories they've been explicitly granted access to
-    const { userId: clerkUserId } = await auth();
-    if (clerkUserId) {
-      const user = await db.user.findUnique({
-        where: { clerkUserId },
-        select: { categoryAccess: { select: { categoryId: true } } },
-      });
-      accessibleCategoryIds = user?.categoryAccess.map((a) => a.categoryId) ?? [];
-    } else {
-      accessibleCategoryIds = [];
-    }
-  }
+  const accessibleCategoryIds = await getAccessibleCategoryIds();
 
   const rows = await db.category.findMany({
-    where: accessibleCategoryIds !== null ? { id: { in: accessibleCategoryIds } } : undefined,
+    where: { id: { in: accessibleCategoryIds } },
     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
     include: {
       projects: {
@@ -100,6 +121,7 @@ export async function getCategories(): Promise<CategoryWithProjects[]> {
     name: cat.name,
     slug: cat.slug,
     isDefault: cat.isDefault,
+    isPersonal: cat.ownerId !== null,
     order: cat.order,
     projects: cat.projects.map((p) => ({
       id: p.id,
@@ -148,6 +170,9 @@ export async function getProjectsByCategory(categoryId: string) {
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export async function createCategory(name: string): Promise<CategoryRow> {
+  const role = await getCurrentRole();
+  if (role !== "ADMIN") throw new Error("Unauthorized");
+
   const slug = toSlug(name);
   const maxOrder = await db.category.aggregate({ _max: { order: true } });
   const nextOrder = (maxOrder._max.order ?? -1) + 1;
@@ -157,20 +182,61 @@ export async function createCategory(name: string): Promise<CategoryRow> {
   });
 
   revalidatePath("/", "layout");
-  return { id: cat.id, name: cat.name, slug: cat.slug, isDefault: cat.isDefault, order: cat.order };
+  return {
+    id: cat.id,
+    name: cat.name,
+    slug: cat.slug,
+    isDefault: cat.isDefault,
+    isPersonal: cat.ownerId !== null,
+    order: cat.order,
+  };
 }
 
 export async function updateCategory(id: string, name: string): Promise<CategoryRow> {
+  const [role, currentUserId] = await Promise.all([getCurrentRole(), getCurrentDbUserId()]);
+  const existing = await db.category.findUnique({
+    where: { id },
+    select: { ownerId: true },
+  });
+
+  if (!existing) throw new Error("Category not found.");
+  if (existing.ownerId) {
+    if (!currentUserId || existing.ownerId !== currentUserId) throw new Error("Unauthorized");
+  } else if (role !== "ADMIN") {
+    throw new Error("Unauthorized");
+  }
+
   const cat = await db.category.update({
     where: { id },
     data: { name: name.trim() },
   });
   revalidatePath("/", "layout");
-  return { id: cat.id, name: cat.name, slug: cat.slug, isDefault: cat.isDefault, order: cat.order };
+  return {
+    id: cat.id,
+    name: cat.name,
+    slug: cat.slug,
+    isDefault: cat.isDefault,
+    isPersonal: cat.ownerId !== null,
+    order: cat.order,
+  };
 }
 
 export async function deleteCategory(id: string) {
-  const fallback = await db.category.findUnique({ where: { slug: "clients" } });
+  const [role, currentUserId] = await Promise.all([getCurrentRole(), getCurrentDbUserId()]);
+  const category = await db.category.findUnique({
+    where: { id },
+    select: { id: true, ownerId: true, isDefault: true },
+  });
+
+  if (!category) throw new Error("Category not found.");
+  if (category.ownerId) {
+    if (!currentUserId || category.ownerId !== currentUserId) throw new Error("Unauthorized");
+  } else {
+    if (role !== "ADMIN") throw new Error("Unauthorized");
+    if (category.isDefault) throw new Error("Default categories cannot be deleted.");
+  }
+
+  const fallback = await db.category.findFirst({ where: { slug: "clients", ownerId: null } });
   if (fallback) {
     await db.project.updateMany({ where: { categoryId: id }, data: { categoryId: fallback.id } });
   }

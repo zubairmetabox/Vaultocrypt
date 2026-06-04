@@ -22,13 +22,15 @@ type Props = {
   categoryId: string;
   categoryName: string;
   isDefault: boolean;
+  isPersonal: boolean;
   projectCount: number;
 };
 
-export function CategoryActions({ categoryId, categoryName, isDefault, projectCount }: Props) {
+export function CategoryActions({ categoryId, categoryName, isDefault, isPersonal, projectCount }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const role = useRole();
+  const canManageCategory = role === "ADMIN" || isPersonal;
 
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState(categoryName);
@@ -82,12 +84,12 @@ export function CategoryActions({ categoryId, categoryName, isDefault, projectCo
     });
   }
 
-  if (role !== "ADMIN") return null;
+  if (!canManageCategory) return null;
 
   return (
     <>
       <div className="flex items-center gap-2">
-        <CategoryManageUsers categoryId={categoryId} categoryName={categoryName} />
+        {!isPersonal && <CategoryManageUsers categoryId={categoryId} categoryName={categoryName} />}
 
         <Button
           size="sm"

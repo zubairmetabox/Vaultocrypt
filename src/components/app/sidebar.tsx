@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Folder,
   FolderKanban,
+  Lock,
   Loader2,
   Plus,
   Settings2,
@@ -92,6 +93,7 @@ export function Sidebar({ pathname, categories, pendingCategoryIds = [] }: Sideb
       name: name.trim(),
       slug,
       isDefault: false,
+      isPersonal: false,
       order: 999,
       projects: [],
     };
@@ -99,15 +101,16 @@ export function Sidebar({ pathname, categories, pendingCategoryIds = [] }: Sideb
     setOpenMap((prev) => ({ ...prev, [tempId]: false }));
   }
 
-  const allCats = [...categories, ...optimisticCats];
+  const teamCats = [...categories.filter((c) => !c.isPersonal), ...optimisticCats];
+  const personalCat = categories.find((c) => c.isPersonal) ?? null;
 
   return (
     <aside className="flex h-full min-h-0 w-full flex-col rounded-[2rem] border border-border/70 bg-sidebar p-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
       <BrandMark />
 
       <nav className="mt-6 flex flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-0.5">
-        {/* ── Dynamic category sections ───────────────────────────────────── */}
-        {allCats.map((cat) => {
+        {/* ── Team category sections ──────────────────────────────────────── */}
+        {teamCats.map((cat) => {
           const Icon = CATEGORY_ICONS[cat.slug] ?? Folder;
           const isActive =
             pathname === `/categories/${cat.id}` ||
@@ -139,6 +142,28 @@ export function Sidebar({ pathname, categories, pendingCategoryIds = [] }: Sideb
             <Plus className="size-3.5" />
             Add category
           </button>
+        )}
+
+        {/* ── Personal section ────────────────────────────────────────────── */}
+        {personalCat && (
+          <>
+            <div className="my-1 border-t border-border/40" />
+            <CategorySection
+              key={personalCat.id}
+              cat={personalCat}
+              icon={Lock}
+              active={
+                pathname === `/categories/${personalCat.id}` ||
+                personalCat.projects.some((p) => pathname === `/projects/${p.id}`)
+              }
+              open={openMap[personalCat.id] ?? false}
+              pathname={pathname}
+              onToggle={() => toggle(personalCat.id)}
+              isOptimistic={false}
+              isMovePending={pendingCategoryIds.includes(personalCat.id)}
+              isPersonal
+            />
+          </>
         )}
 
         {/* ── Bottom nav ──────────────────────────────────────────────────── */}
@@ -189,6 +214,7 @@ function CategorySection({
   onToggle,
   isOptimistic,
   isMovePending,
+  isPersonal,
 }: {
   cat: CategoryWithProjects;
   icon: React.ElementType;
@@ -198,6 +224,7 @@ function CategorySection({
   onToggle: () => void;
   isOptimistic?: boolean;
   isMovePending?: boolean;
+  isPersonal?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `category-drop-${cat.id}`,
@@ -213,7 +240,9 @@ function CategorySection({
         ? "border border-primary/50 bg-primary/10 text-foreground shadow-lg shadow-slate-950/10"
         : active
           ? "border border-border/80 bg-accent text-accent-foreground shadow-lg shadow-slate-950/10"
-          : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+          : isPersonal
+            ? "border border-primary/20 bg-primary/5 text-foreground/80 hover:bg-primary/10 hover:text-foreground"
+            : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
   );
 
   return (
