@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KeyRound, Loader2, StickyNote } from "lucide-react";
+import { FileText, KeyRound, Loader2 } from "lucide-react";
 
 import { AlertCircle } from "lucide-react";
 
@@ -26,6 +26,7 @@ export type RecordFormInput = {
   url: string | null;
   username: string | null;
   notes: string | null;
+  hasEncryptedContent?: boolean;
 };
 
 export type RecordDraft = {
@@ -36,6 +37,7 @@ export type RecordDraft = {
   username: string;
   secretValue: string;
   notes: string;
+  encryptNote: boolean;
 };
 
 type RecordFormDialogProps = {
@@ -43,6 +45,7 @@ type RecordFormDialogProps = {
   onOpenChange: (open: boolean) => void;
   /** Pass a record to edit it; omit for create mode. */
   record?: RecordFormInput;
+  defaultType?: RecordDraft["type"];
   onSave: (draft: RecordDraft) => void;
   /** Controls save button loading state — managed by the parent transition. */
   isPending?: boolean;
@@ -58,6 +61,7 @@ const EMPTY_DRAFT: RecordDraft = {
   username: "",
   secretValue: "",
   notes: "",
+  encryptNote: true,
 };
 
 function toDraft(record: RecordFormInput): RecordDraft {
@@ -69,28 +73,34 @@ function toDraft(record: RecordFormInput): RecordDraft {
     username: record.username ?? "",
     secretValue: "",
     notes: record.notes ?? "",
+    encryptNote: record.hasEncryptedContent ?? record.type === "secure_note",
   };
+}
+
+function emptyDraft(type: RecordDraft["type"]): RecordDraft {
+  return { ...EMPTY_DRAFT, type };
 }
 
 export function RecordFormDialog({
   open,
   onOpenChange,
   record,
+  defaultType = "credential",
   onSave,
   isPending = false,
   error,
 }: RecordFormDialogProps) {
   const isEdit = Boolean(record);
   const [draft, setDraft] = useState<RecordDraft>(() =>
-    record ? toDraft(record) : EMPTY_DRAFT,
+    record ? toDraft(record) : emptyDraft(defaultType),
   );
 
   // Reset form every time the dialog opens (covers both create and edit)
   useEffect(() => {
     if (open) {
-      setDraft(record ? toDraft(record) : EMPTY_DRAFT);
+      setDraft(record ? toDraft(record) : emptyDraft(defaultType));
     }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [defaultType, open, record]);
 
   function handleOpenChange(nextOpen: boolean) {
     if (isPending) return; // block close while saving
@@ -108,16 +118,19 @@ export function RecordFormDialog({
   }
 
   const isCredential = draft.type === "credential";
+  const createLabel = isCredential ? "Add credential" : "Add note";
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit record" : "Add record"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit record" : createLabel}</DialogTitle>
           <DialogDescription>
             {isEdit
               ? "Update the details for this vault record."
-              : "Create a new credential or secure note for this client."}
+              : isCredential
+                ? "Create a new credential for this project."
+                : "Capture a secure note for this project."}
           </DialogDescription>
         </DialogHeader>
 
@@ -140,8 +153,8 @@ export function RecordFormDialog({
                   Credential
                 </ToggleGroupItem>
                 <ToggleGroupItem value="secure_note" className="flex-1 gap-2">
-                  <StickyNote className="size-4" />
-                  Secure note
+                  <FileText className="size-4" />
+                  Note
                 </ToggleGroupItem>
               </ToggleGroup>
             </div>
@@ -159,15 +172,17 @@ export function RecordFormDialog({
 
             {/* Service + URL */}
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label>Service</Label>
-                <Input
-                  placeholder="e.g. Cloudflare"
-                  value={draft.service}
-                  onChange={(e) => set("service", e.target.value)}
-                  disabled={isPending}
-                />
-              </div>
+              {isCredential && (
+                <div className="grid gap-2">
+                  <Label>Service</Label>
+                  <Input
+                    placeholder="e.g. Cloudflare"
+                    value={draft.service}
+                    onChange={(e) => set("service", e.target.value)}
+                    disabled={isPending}
+                  />
+                </div>
+              )}
               {isCredential && (
                 <div className="grid gap-2">
                   <Label>URL</Label>
@@ -207,6 +222,24 @@ export function RecordFormDialog({
               </div>
             )}
 
+            {!isCredential && (
+              <label className="flex items-center justify-between gap-4 rounded-[1rem] border border-border/60 bg-card/60 px-4 py-3">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">Encrypt note</p>
+                  <p className="text-xs text-muted-foreground">
+                    Store the full note body encrypted. This is on by default.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={draft.encryptNote}
+                  onChange={(e) => set("encryptNote", e.target.checked)}
+                  disabled={isPending}
+                  className="size-4 accent-primary"
+                />
+              </label>
+            )}
+
             {/* Notes */}
             <div className="grid gap-2">
               <Label>{isCredential ? "Notes (optional)" : "Content"}</Label>
@@ -214,9 +247,11 @@ export function RecordFormDialog({
                 placeholder={
                   isCredential
                     ? "Any additional context for this credential…"
-                    : "Paste your secure note content here…"
+                    : draft.encryptNote
+                      ? "Write the note content that should be stored encrypted…"
+                      : "Write this like a Keep note: quick ideas, snippets, reminders, or handoff details…"
                 }
-                rows={isCredential ? 2 : 4}
+                rows={isCredential ? 2 : 7}
                 value={draft.notes}
                 onChange={(e) => set("notes", e.target.value)}
                 disabled={isPending}
@@ -239,7 +274,7 @@ export function RecordFormDialog({
           </Button>
           <Button onClick={handleSave} disabled={!draft.title.trim() || isPending}>
             {isPending && <Loader2 className="size-4 animate-spin" />}
-            {isEdit ? "Save changes" : "Add record"}
+            {isEdit ? "Save changes" : createLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

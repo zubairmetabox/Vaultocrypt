@@ -5,16 +5,16 @@ import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   ArrowRightLeft,
-  Check,
   ClipboardCheck,
   Copy,
   Eye,
   EyeOff,
+  Expand,
+  FileText,
   KeyRound,
   Loader2,
   PencilLine,
   Plus,
-  StickyNote,
   Trash2,
 } from "lucide-react";
 
@@ -55,6 +55,25 @@ type RecordListProps = {
 };
 
 type DeleteTarget = { id: string; title: string } | null;
+type CreateType = "credential" | "secure_note";
+type OpenNoteState = {
+  id: string;
+  title: string;
+  content: string;
+  isLoading: boolean;
+} | null;
+
+function isOptimisticRecord(recordId: string) {
+  return recordId.startsWith("optimistic-");
+}
+
+function resolveNotePreview(record: RecordItem, revealedSecret?: string) {
+  if (record.hasEncryptedContent) {
+    return revealedSecret ?? "Hidden note content";
+  }
+
+  return record.notes || "Empty note";
+}
 
 function formatDate(date: Date): string {
   return date.toLocaleString("en-GB", {
@@ -77,29 +96,38 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
   const [isEditing, startEdit] = useTransition();
   const [isDeleting, startDelete] = useTransition();
 
-  // Keep local copy in sync when server refreshes props
   const [records, setRecords] = useState<RecordItem[]>(initialRecords);
-  useEffect(() => { setRecords(initialRecords); }, [initialRecords]);
+  useEffect(() => {
+    setRecords(initialRecords);
+  }, [initialRecords]);
 
-  // Revealed secrets stored client-side only (never in the initial render)
   const [revealedSecrets, setRevealedSecrets] = useState<Map<string, string>>(new Map());
   const [revealingId, setRevealingId] = useState<string | null>(null);
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editRecord, setEditRecord] = useState<RecordItem | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createType, setCreateType] = useState<CreateType>("credential");
   const [createError, setCreateError] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [moveTarget, setMoveTarget] = useState<{ id: string; title: string } | null>(null);
+  const [openNote, setOpenNote] = useState<OpenNoteState>(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Reveal ────────────────────────────────────────────────────────────────
-
   async function handleReveal(record: RecordItem) {
+    if (record.type === "secure_note" && !record.hasEncryptedContent) {
+      setRevealedSecrets((prev) => {
+        const next = new Map(prev);
+        if (next.has(record.id)) next.delete(record.id);
+        else next.set(record.id, record.notes || "");
+        return next;
+      });
+      return;
+    }
+
     if (revealedSecrets.has(record.id)) {
-      // Hide
       setRevealedSecrets((prev) => {
         const next = new Map(prev);
         next.delete(record.id);
@@ -107,6 +135,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
       });
       return;
     }
+
     setRevealingId(record.id);
     try {
       const secret = await revealSecret(record.id);
@@ -116,10 +145,29 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
     }
   }
 
-  // ── Copy ──────────────────────────────────────────────────────────────────
-
   const handleCopy = useCallback(async (record: RecordItem) => {
-    // Always call copySecret so the audit event is written even if already revealed
+    if (record.type === "secure_note" && !record.hasEncryptedContent) {
+      const value = record.notes || "";
+      if (!value) return;
+
+      try {
+        await navigator.clipboard.writeText(value);
+      } catch {
+        const el = document.createElement("textarea");
+        el.value = value;
+        el.style.cssText = "position:fixed;opacity:0";
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+      }
+
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      setCopiedId(record.id);
+      copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 2000);
+      return;
+    }
+
     const value = await copySecret(record.id);
     if (!value) return;
 
@@ -138,22 +186,63 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
     if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     setCopiedId(record.id);
     copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 2000);
-  }, [revealedSecrets]);
+  }, []);
 
-  // ── Create ────────────────────────────────────────────────────────────────
+  async function handleOpenNote(record: RecordItem) {
+    if (record.type !== "secure_note" || isOptimisticRecord(record.id)) return;
+
+    const hasEncryptedContent = Boolean(record.hasEncryptedContent);
+    const cachedContent = revealedSecrets.get(record.id);
+    const initialContent = hasEncryptedContent
+      ? cachedContent ?? ""
+      : record.notes || "";
+
+    setOpenNote({
+      id: record.id,
+      title: record.title,
+      content: initialContent,
+      isLoading: hasEncryptedContent && !cachedContent,
+    });
+
+    if (!hasEncryptedContent || cachedContent) return;
+
+    try {
+      const secret = await revealSecret(record.id);
+      setRevealedSecrets((prev) => new Map(prev).set(record.id, secret));
+      setOpenNote((current) =>
+        current && current.id === record.id
+          ? { ...current, content: secret, isLoading: false }
+          : current,
+      );
+    } catch {
+      setOpenNote((current) =>
+        current && current.id === record.id
+          ? { ...current, content: "Unable to open note right now.", isLoading: false }
+          : current,
+      );
+    }
+  }
+
+  function openCreateDialog(type: CreateType) {
+    setCreateType(type);
+    setCreateError(null);
+    setCreateOpen(true);
+  }
 
   function handleSaveNew(draft: RecordDraft) {
     setCreateError(null);
     const tempId = `optimistic-${Date.now()}`;
+
     setRecords((prev) => [
       {
         id: tempId,
         title: draft.title,
         type: draft.type,
-        serviceName: draft.service || null,
+        serviceName: draft.type === "credential" ? draft.service || null : null,
         url: draft.url || null,
         username: draft.username || null,
-        notes: draft.notes || null,
+        notes: draft.type === "secure_note" && !draft.encryptNote ? draft.notes || null : null,
+        hasEncryptedContent: draft.type === "secure_note" ? draft.encryptNote : Boolean(draft.secretValue),
         updatedAt: new Date(),
       },
       ...prev,
@@ -165,11 +254,17 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
           projectId,
           title: draft.title,
           type: draft.type === "credential" ? "CREDENTIAL" : "SECURE_NOTE",
-          serviceName: draft.service,
+          serviceName: draft.type === "credential" ? draft.service : undefined,
           url: draft.url,
           username: draft.username,
-          secretValue: draft.secretValue,
-          notes: draft.notes,
+          secretValue:
+            draft.type === "secure_note"
+              ? (draft.encryptNote ? draft.notes : undefined)
+              : draft.secretValue,
+          notes:
+            draft.type === "secure_note"
+              ? (draft.encryptNote ? undefined : draft.notes)
+              : draft.notes,
         });
         setCreateOpen(false);
         router.refresh();
@@ -180,12 +275,11 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
     });
   }
 
-  // ── Edit ──────────────────────────────────────────────────────────────────
-
   function handleSaveEdit(draft: RecordDraft) {
     if (!editRecord) return;
     setEditError(null);
     const snapshot = editRecord;
+
     setRecords((prev) =>
       prev.map((r) =>
         r.id === snapshot.id
@@ -193,10 +287,11 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
               ...r,
               title: draft.title,
               type: draft.type,
-              serviceName: draft.service || null,
+              serviceName: draft.type === "credential" ? draft.service || null : null,
               url: draft.url || null,
               username: draft.username || null,
-              notes: draft.notes || null,
+              notes: draft.type === "secure_note" && !draft.encryptNote ? draft.notes || null : null,
+              hasEncryptedContent: draft.type === "secure_note" ? draft.encryptNote : Boolean(draft.secretValue),
               updatedAt: new Date(),
             }
           : r,
@@ -208,11 +303,17 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
         await updateRecord(snapshot.id, projectId, {
           title: draft.title,
           type: draft.type === "credential" ? "CREDENTIAL" : "SECURE_NOTE",
-          serviceName: draft.service,
+          serviceName: draft.type === "credential" ? draft.service : "",
           url: draft.url,
           username: draft.username,
-          secretValue: draft.secretValue || undefined,
-          notes: draft.notes,
+          secretValue:
+            draft.type === "secure_note"
+              ? (draft.encryptNote ? draft.notes : "")
+              : (draft.secretValue || undefined),
+          notes:
+            draft.type === "secure_note"
+              ? (draft.encryptNote ? "" : draft.notes)
+              : draft.notes,
         });
         setEditRecord(null);
         router.refresh();
@@ -222,8 +323,6 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
       }
     });
   }
-
-  // ── Delete ────────────────────────────────────────────────────────────────
 
   function handleDelete() {
     if (!deleteTarget) return;
@@ -256,7 +355,8 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
         const q = query.toLowerCase();
         return (
           r.title.toLowerCase().includes(q) ||
-          (r.serviceName?.toLowerCase().includes(q) ?? false)
+          (r.serviceName?.toLowerCase().includes(q) ?? false) ||
+          (!r.hasEncryptedContent && (r.notes?.toLowerCase().includes(q) ?? false))
         );
       })
     : records;
@@ -265,34 +365,52 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
     <>
       <Card className="border-border/70 bg-card/95">
         <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <CardTitle>Records</CardTitle>
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="size-4" />
-            Add record
-          </Button>
+          <div className="space-y-1">
+            <CardTitle>Records / Notes</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Credentials stay structured. Notes feel lighter and faster to scan.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => openCreateDialog("secure_note")}>
+              <FileText className="size-4" />
+              Add note
+            </Button>
+            <Button size="sm" onClick={() => openCreateDialog("credential")}>
+              <Plus className="size-4" />
+              Add record
+            </Button>
+          </div>
         </CardHeader>
 
         <CardContent className="space-y-3">
           {records.length === 0 ? (
             <div className="flex flex-col items-center gap-3 rounded-[1.5rem] border border-dashed border-border/70 py-10 text-center">
               <div className="flex size-12 items-center justify-center rounded-[1.25rem] bg-muted">
-                <KeyRound className="size-5 text-muted-foreground" />
+                <FileText className="size-5 text-muted-foreground" />
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">No records yet</p>
+                <p className="text-sm font-medium text-foreground">No records or notes yet</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Add the first credential or secure note for this project.
+                  Add the first credential or jot down a quick project note.
                 </p>
               </div>
-              <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
-                <Plus className="size-4" />
-                Add record
-              </Button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => openCreateDialog("secure_note")}>
+                  <FileText className="size-4" />
+                  Add note
+                </Button>
+                <Button size="sm" onClick={() => openCreateDialog("credential")}>
+                  <Plus className="size-4" />
+                  Add record
+                </Button>
+              </div>
             </div>
           ) : isSearching && displayRecords.length === 0 ? (
             <div className="flex flex-col items-center gap-2 rounded-[1.5rem] border border-dashed border-border/70 py-10 text-center">
-              <p className="text-sm font-medium text-foreground">No records match &ldquo;{query}&rdquo;</p>
-              <p className="text-xs text-muted-foreground">Try a different title or service name.</p>
+              <p className="text-sm font-medium text-foreground">No records or notes match &ldquo;{query}&rdquo;</p>
+              <p className="text-xs text-muted-foreground">Try a different title, service, or note phrase.</p>
             </div>
           ) : (
             displayRecords.map((record) => {
@@ -301,91 +419,152 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
               const isRevealing = revealingId === record.id;
               const isCopied = copiedId === record.id;
               const isNote = record.type === "secure_note";
-              const secretDisplay = isRevealed
-                ? (secret || "—")
-                : "•".repeat(18);
+              const isOptimistic = isOptimisticRecord(record.id);
+              const canServerReveal = !isNote || record.hasEncryptedContent;
+              const secretDisplay = isRevealed ? (secret || "—") : "•".repeat(18);
 
               return (
                 <div
                   key={record.id}
-                  className="rounded-[1.5rem] border border-border/70 bg-background/95 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                  className={
+                    isNote
+                      ? "rounded-[1.5rem] border border-amber-200/10 bg-[linear-gradient(180deg,rgba(245,158,11,0.12),rgba(15,23,42,0.96))] p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                      : "rounded-[1.5rem] border border-border/70 bg-background/95 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                  }
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 flex-1 space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-muted">
+                        <div
+                          className={
+                            isNote
+                              ? "flex size-8 shrink-0 items-center justify-center rounded-xl bg-amber-300/10 text-amber-100"
+                              : "flex size-6 shrink-0 items-center justify-center rounded-lg bg-muted"
+                          }
+                        >
                           {isNote ? (
-                            <StickyNote className="size-3.5 text-muted-foreground" />
+                            <FileText className="size-4" />
                           ) : (
                             <KeyRound className="size-3.5 text-muted-foreground" />
                           )}
                         </div>
                         <p className="font-medium text-foreground">{record.title}</p>
                         <Badge variant="outline" className="text-xs">
-                          {isNote ? "secure note" : "credential"}
+                          {isNote ? "note" : "credential"}
                         </Badge>
                       </div>
 
-                      <div className="space-y-0.5">
-                        {record.url ? (
-                          <div className="flex items-baseline gap-2">
-                            <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">URL</span>
-                            <a
-                              href={record.url.startsWith("http") ? record.url : `https://${record.url}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="min-w-0 truncate text-sm text-foreground hover:underline"
-                            >
+                      {isNote ? (
+                        <div className="space-y-2">
+                          {(record.serviceName || record.url) && (
+                            <p className="text-xs font-medium uppercase tracking-[0.18em] text-amber-100/70">
                               {record.serviceName || record.url}
-                            </a>
-                          </div>
-                        ) : record.serviceName ? (
-                          <div className="flex items-baseline gap-2">
-                            <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">Service</span>
-                            <span className="text-sm text-foreground">{record.serviceName}</span>
-                          </div>
-                        ) : null}
-                        {!isNote && record.username && (
-                          <div className="flex items-baseline gap-2">
-                            <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">Username</span>
-                            <span className="min-w-0 truncate text-sm text-foreground">{record.username}</span>
-                          </div>
-                        )}
-                      </div>
+                            </p>
+                          )}
 
-                      <div className="flex items-center gap-2">
-                        <code
-                          className={`rounded-lg border border-border/50 bg-muted/60 px-2.5 py-1 text-xs ${
-                            isRevealed
-                              ? "font-mono text-foreground"
-                              : "select-none tracking-[0.3em] text-muted-foreground"
-                          }`}
-                        >
-                          {isRevealed && isNote && secretDisplay.length > 80
-                            ? secretDisplay.slice(0, 80) + "…"
-                            : secretDisplay}
-                        </code>
-                      </div>
+                          <div className="rounded-[1.2rem] border border-amber-200/10 bg-slate-950/18 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                            <p className="whitespace-pre-wrap text-sm leading-6 text-foreground/92">
+                              {isOptimistic
+                                ? "Saving note…"
+                                : isRevealed
+                                ? resolveNotePreview(record, secret)
+                                : record.hasEncryptedContent
+                                  ? "Hidden note content"
+                                  : resolveNotePreview(record).slice(0, 180)}
+                              {!isRevealed &&
+                              !record.hasEncryptedContent &&
+                              resolveNotePreview(record).length > 180
+                                ? "…"
+                                : ""}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="space-y-0.5">
+                            {record.url ? (
+                              <div className="flex items-baseline gap-2">
+                                <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">URL</span>
+                                <a
+                                  href={record.url.startsWith("http") ? record.url : `https://${record.url}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="min-w-0 truncate text-sm text-foreground hover:underline"
+                                >
+                                  {record.serviceName || record.url}
+                                </a>
+                              </div>
+                            ) : record.serviceName ? (
+                              <div className="flex items-baseline gap-2">
+                                <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">Service</span>
+                                <span className="text-sm text-foreground">{record.serviceName}</span>
+                              </div>
+                            ) : null}
+
+                            {record.username && (
+                              <div className="flex items-baseline gap-2">
+                                <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">Username</span>
+                                <span className="min-w-0 truncate text-sm text-foreground">{record.username}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <code
+                              className={`rounded-lg border border-border/50 bg-muted/60 px-2.5 py-1 text-xs ${
+                                isRevealed
+                                  ? "font-mono text-foreground"
+                                  : "select-none tracking-[0.3em] text-muted-foreground"
+                              }`}
+                            >
+                              {secretDisplay}
+                            </code>
+                          </div>
+                        </>
+                      )}
 
                       <p className="text-xs text-muted-foreground">
-                        Updated {formatDate(record.updatedAt)}
+                        {isOptimistic ? "Saving…" : `Updated ${formatDate(record.updatedAt)}`}
                       </p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                      {isNote && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleOpenNote(record)}
+                          disabled={isOptimistic}
+                        >
+                          <Expand className="size-4" />
+                          Open
+                        </Button>
+                      )}
+
                       <Button
                         size="sm"
                         variant={isRevealed ? "default" : "outline"}
                         onClick={() => handleReveal(record)}
-                        disabled={isRevealing}
+                        disabled={isOptimistic || (canServerReveal && isRevealing)}
                       >
-                        {isRevealing ? (
+                        {isOptimistic ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" />
+                            Saving
+                          </>
+                        ) : canServerReveal && isRevealing ? (
                           <Loader2 className="size-4 animate-spin" />
                         ) : isRevealed ? (
-                          <><EyeOff className="size-4" /> Hide</>
+                          <>
+                            <EyeOff className="size-4" />
+                            Hide
+                          </>
                         ) : (
-                          <><Eye className="size-4" /> Reveal</>
+                          <>
+                            <Eye className="size-4" />
+                            Reveal
+                          </>
                         )}
                       </Button>
 
@@ -394,18 +573,34 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                         variant="outline"
                         onClick={() => handleCopy(record)}
                         className="transition-all"
+                        disabled={isOptimistic}
                       >
                         {isCopied ? (
-                          <><ClipboardCheck className="size-4 text-primary" /> Copied</>
+                          <>
+                            <ClipboardCheck className="size-4 text-primary" />
+                            Copied
+                          </>
                         ) : (
-                          <><Copy className="size-4" /> Copy</>
+                          <>
+                            <Copy className="size-4" />
+                            Copy
+                          </>
                         )}
                       </Button>
 
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setEditRecord(record)}
+                        onClick={() =>
+                          setEditRecord({
+                            ...record,
+                            notes:
+                              record.type === "secure_note" && revealedSecrets.has(record.id)
+                                ? revealedSecrets.get(record.id) ?? record.notes
+                                : record.notes,
+                          })
+                        }
+                        disabled={isOptimistic}
                       >
                         <PencilLine className="size-4" />
                         Edit
@@ -416,6 +611,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                           size="sm"
                           variant="outline"
                           onClick={() => setMoveTarget({ id: record.id, title: record.title })}
+                          disabled={isOptimistic}
                         >
                           <ArrowRightLeft className="size-4" />
                           Move
@@ -428,6 +624,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                           variant="ghost"
                           className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                           onClick={() => setDeleteTarget({ id: record.id, title: record.title })}
+                          disabled={isOptimistic}
                         >
                           <Trash2 className="size-4" />
                         </Button>
@@ -441,29 +638,39 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
         </CardContent>
       </Card>
 
-      {/* Create */}
       <RecordFormDialog
         open={createOpen}
-        onOpenChange={(o) => { if (!isCreating) { setCreateOpen(o); if (o) setCreateError(null); } }}
+        onOpenChange={(open) => {
+          if (!isCreating) {
+            setCreateOpen(open);
+            if (open) setCreateError(null);
+          }
+        }}
+        defaultType={createType}
         onSave={handleSaveNew}
         isPending={isCreating}
         error={createError}
       />
 
-      {/* Edit */}
       <RecordFormDialog
         open={Boolean(editRecord)}
-        onOpenChange={(o) => { if (!o && !isEditing) { setEditRecord(null); setEditError(null); } }}
+        onOpenChange={(open) => {
+          if (!open && !isEditing) {
+            setEditRecord(null);
+            setEditError(null);
+          }
+        }}
         record={editRecord ?? undefined}
         onSave={handleSaveEdit}
         isPending={isEditing}
         error={editError}
       />
 
-      {/* Delete confirmation */}
       <Dialog
         open={Boolean(deleteTarget)}
-        onOpenChange={(o) => { if (!o && !isDeleting) setDeleteTarget(null); }}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setDeleteTarget(null);
+        }}
       >
         <DialogContent>
           <DialogHeader>
@@ -474,14 +681,23 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
               project. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
+
           {deleteError && (
             <div className="mx-6 flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               <AlertCircle className="size-4 shrink-0" />
               {deleteError}
             </div>
           )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setDeleteTarget(null); setDeleteError(null); }} disabled={isDeleting}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteTarget(null);
+                setDeleteError(null);
+              }}
+              disabled={isDeleting}
+            >
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
@@ -492,17 +708,55 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
         </DialogContent>
       </Dialog>
 
-      {/* Move record */}
       {categories && moveTarget && (
         <MoveRecordDialog
           open={Boolean(moveTarget)}
-          onOpenChange={(o) => { if (!o) setMoveTarget(null); }}
+          onOpenChange={(open) => {
+            if (!open) setMoveTarget(null);
+          }}
           recordId={moveTarget.id}
           recordTitle={moveTarget.title}
           currentProjectId={projectId}
           categories={categories}
         />
       )}
+
+      <Dialog
+        open={Boolean(openNote)}
+        onOpenChange={(open) => {
+          if (!open) setOpenNote(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{openNote?.title ?? "Note"}</DialogTitle>
+            <DialogDescription>
+              Full note view with revealed content.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="px-6 pb-2">
+            <div className="min-h-48 rounded-[1.25rem] border border-border/70 bg-card/70 px-4 py-4">
+              {openNote?.isLoading ? (
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" />
+                  Revealing note…
+                </div>
+              ) : (
+                <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">
+                  {openNote?.content || "Empty note"}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenNote(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

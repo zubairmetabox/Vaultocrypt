@@ -72,6 +72,7 @@ export async function getProjectWithRecords(projectId: string) {
           serviceName: true,
           url: true,
           username: true,
+          secretCipher: true,
           notes: true,
           sensitivity: true,
           isRestricted: true,

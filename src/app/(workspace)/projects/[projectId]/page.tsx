@@ -60,6 +60,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     url: r.url,
     username: r.username,
     notes: r.notes,
+    hasEncryptedContent: Boolean(r.secretCipher),
     updatedAt: r.updatedAt,
   }));
 
