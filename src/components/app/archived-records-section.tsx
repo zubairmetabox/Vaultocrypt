@@ -43,7 +43,7 @@ function formatDate(date: Date) {
 
 export function ArchivedRecordsSection({ projectId, initialRecords, isAdmin }: Props) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [records, setRecords] = useState(initialRecords);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ArchivedRecordRow | null>(null);
