@@ -115,6 +115,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editRecord, setEditRecord] = useState<RecordItem | null>(null);
+  const [editLoadingId, setEditLoadingId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createType, setCreateType] = useState<CreateType>("credential");
   const [createError, setCreateError] = useState<string | null>(null);
@@ -293,6 +294,28 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
     });
   }
 
+  async function handleEditClick(record: RecordItem) {
+    // For encrypted notes not yet revealed: fetch content before opening the form
+    if (record.type === "secure_note" && record.hasEncryptedContent && !revealedSecrets.has(record.id)) {
+      setEditLoadingId(record.id);
+      try {
+        const content = await revealSecret(record.id);
+        setRevealedSecrets((prev) => new Map(prev).set(record.id, content));
+        setEditRecord({ ...record, notes: content });
+      } finally {
+        setEditLoadingId(null);
+      }
+    } else {
+      setEditRecord({
+        ...record,
+        notes:
+          record.type === "secure_note" && revealedSecrets.has(record.id)
+            ? revealedSecrets.get(record.id) ?? record.notes
+            : record.notes,
+      });
+    }
+  }
+
   function handleSaveEdit(draft: RecordDraft) {
     if (!editRecord) return;
     setEditError(null);
@@ -310,9 +333,9 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
               username: draft.username || null,
               notes: draft.type === "secure_note" && !draft.encryptNote ? draft.notes || null : null,
               hasEncryptedContent: draft.type === "secure_note" ? draft.encryptNote : Boolean(draft.secretValue),
-              hasHistory: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+              hasHistory: true,
+              createdAt: r.createdAt,
+              updatedAt: new Date(),
             }
           : r,
       ),
@@ -664,18 +687,14 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() =>
-                          setEditRecord({
-                            ...record,
-                            notes:
-                              record.type === "secure_note" && revealedSecrets.has(record.id)
-                                ? revealedSecrets.get(record.id) ?? record.notes
-                                : record.notes,
-                          })
-                        }
-                        disabled={isOptimistic}
+                        onClick={() => handleEditClick(record)}
+                        disabled={isOptimistic || editLoadingId === record.id}
                       >
-                        <PencilLine className="size-4" />
+                        {editLoadingId === record.id ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <PencilLine className="size-4" />
+                        )}
                         Edit
                       </Button>
 
