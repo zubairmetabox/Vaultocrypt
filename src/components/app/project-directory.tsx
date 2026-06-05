@@ -343,77 +343,11 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
     <Card className="border-border/70 bg-card/95">
       <CardHeader className="gap-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="space-y-3">
-            <div>
-              <CardTitle>Project directory</CardTitle>
-              <CardDescription>
-                Name-led scanning, visible security posture, and fast access to the next action.
-              </CardDescription>
-            </div>
-
-            {isAdmin && (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" onClick={toggleSelectAll}>
-                {allSelected ? "Clear all" : "Select all"}
-              </Button>
-
-              {selectedIds.length > 0 && (
-                <>
-                  <div className="rounded-full border border-border/70 bg-background/70 px-3 py-1 text-xs font-medium text-foreground">
-                    {selectedIds.length} selected
-                  </div>
-                  <Button size="sm" variant="outline" onClick={exportCsv}>
-                    <Download className="size-4" />
-                    Export CSV
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => { setSelectedMoveCategory(null); setMoveOpen(true); }}
-                  >
-                    <ArrowRightLeft className="size-4" />
-                    Move
-                  </Button>
-                  <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" variant="destructive">
-                        <Trash2 className="size-4" />
-                        Archive
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Archive selected projects</DialogTitle>
-                        <DialogDescription>
-                          Move {selectedIds.length} project
-                          {selectedIds.length === 1 ? "" : "s"} to the archive. Records are preserved
-                          and everything can be restored from Settings.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setDeleteOpen(false)}>
-                          Cancel
-                        </Button>
-                        <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
-                          {isPending && <Loader2 className="size-4 animate-spin" />}
-                          Move to archive
-                        </Button>
-                      </DialogFooter>
-                      {deleteError && (
-                        <div className="mx-6 mb-4 flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                          <AlertCircle className="size-4 shrink-0" />
-                          {deleteError}
-                        </div>
-                      )}
-                    </DialogContent>
-                  </Dialog>
-                  <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
-                    Clear selection
-                  </Button>
-                </>
-              )}
-            </div>
-            )}
+          <div>
+            <CardTitle>Project directory</CardTitle>
+            <CardDescription>
+              Name-led scanning, visible security posture, and fast access to the next action.
+            </CardDescription>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -538,6 +472,72 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
           </div>
         </div>
       </CardHeader>
+
+      {isAdmin && (
+        <div className="sticky top-0 z-10 border-b border-border/60 bg-card/95 px-6 py-2.5 backdrop-blur-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="outline" onClick={toggleSelectAll}>
+              {allSelected ? "Clear all" : "Select all"}
+            </Button>
+
+            {selectedIds.length > 0 && (
+              <>
+                <div className="rounded-full border border-border/70 bg-background/70 px-3 py-1 text-xs font-medium text-foreground">
+                  {selectedIds.length} selected
+                </div>
+                <Button size="sm" variant="outline" onClick={exportCsv}>
+                  <Download className="size-4" />
+                  Export CSV
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setSelectedMoveCategory(null); setMoveOpen(true); }}
+                >
+                  <ArrowRightLeft className="size-4" />
+                  Move
+                </Button>
+                <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" variant="destructive">
+                      <Trash2 className="size-4" />
+                      Archive
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Archive selected projects</DialogTitle>
+                      <DialogDescription>
+                        Move {selectedIds.length} project
+                        {selectedIds.length === 1 ? "" : "s"} to the archive. Records are preserved
+                        and everything can be restored from Settings.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
+                        {isPending && <Loader2 className="size-4 animate-spin" />}
+                        Move to archive
+                      </Button>
+                    </DialogFooter>
+                    {deleteError && (
+                      <div className="mx-6 mb-4 flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                        <AlertCircle className="size-4 shrink-0" />
+                        {deleteError}
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
+                <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
+                  Clear selection
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <CardContent className="space-y-6">
         {projects.length === 0 ? (
