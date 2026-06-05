@@ -24,6 +24,19 @@ export type RecordRow = {
   updatedAt: Date;
 };
 
+// ─── Shared auth helper ───────────────────────────────────────────────────────
+
+async function requireAccess() {
+  const { getCurrentRole } = await import("@/lib/auth/get-role");
+  const { getAccessibleCategoryIds } = await import("@/lib/actions/categories");
+  const [role, accessibleCategoryIds] = await Promise.all([
+    getCurrentRole(),
+    getAccessibleCategoryIds(),
+  ]);
+  if (role === "NONE") throw new Error("Unauthorized");
+  return { role, accessibleCategoryIds };
+}
+
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 /** Returns record metadata — no secret. Used for the record listing. */
@@ -48,17 +61,11 @@ export async function getRecords(projectId: string): Promise<RecordRow[]> {
   });
 }
 
-/**
- * Privileged action — decrypts and returns the secret value.
- * Must only be called from a server action; never exposed to the client directly.
- */
 export async function revealSecret(recordId: string): Promise<string> {
-  const { getCurrentRole } = await import("@/lib/auth/get-role");
-  const role = await getCurrentRole();
-  if (role === "NONE") throw new Error("Unauthorized");
+  const { role, accessibleCategoryIds } = await requireAccess();
 
-  const record = await db.record.findUniqueOrThrow({
-    where: { id: recordId },
+  const record = await db.record.findFirstOrThrow({
+    where: { id: recordId, project: { categoryId: { in: accessibleCategoryIds } } },
     select: { secretCipher: true, projectId: true, title: true, isRestricted: true },
   });
 
@@ -75,14 +82,11 @@ export async function revealSecret(recordId: string): Promise<string> {
   return record.secretCipher ? decrypt(record.secretCipher) : "";
 }
 
-/** Privileged action — logs SECRET_COPIED then returns the decrypted value for clipboard use. */
 export async function copySecret(recordId: string): Promise<string> {
-  const { getCurrentRole } = await import("@/lib/auth/get-role");
-  const role = await getCurrentRole();
-  if (role === "NONE") throw new Error("Unauthorized");
+  const { role, accessibleCategoryIds } = await requireAccess();
 
-  const record = await db.record.findUniqueOrThrow({
-    where: { id: recordId },
+  const record = await db.record.findFirstOrThrow({
+    where: { id: recordId, project: { categoryId: { in: accessibleCategoryIds } } },
     select: { secretCipher: true, projectId: true, title: true, isRestricted: true },
   });
 
@@ -151,9 +155,11 @@ export type UpdateRecordInput = {
 };
 
 export async function updateRecord(recordId: string, projectId: string, input: UpdateRecordInput) {
-  // Snapshot current values before overwriting so history can be revealed later
-  const prev = await db.record.findUniqueOrThrow({
-    where: { id: recordId },
+  const { accessibleCategoryIds } = await requireAccess();
+
+  // Snapshot current values — also serves as the scope/existence check
+  const prev = await db.record.findFirstOrThrow({
+    where: { id: recordId, project: { categoryId: { in: accessibleCategoryIds } } },
     select: {
       title: true,
       type: true,
@@ -195,7 +201,7 @@ export async function updateRecord(recordId: string, projectId: string, input: U
         serviceName: prev.serviceName,
         url: prev.url,
         username: prev.username,
-        secretCipher: prev.secretCipher, // stored encrypted — revealed via revealAuditValues
+        secretCipher: prev.secretCipher,
         notes: prev.notes,
       },
     },
@@ -206,6 +212,14 @@ export async function updateRecord(recordId: string, projectId: string, input: U
 }
 
 export async function deleteRecord(recordId: string, projectId: string) {
+  const { accessibleCategoryIds } = await requireAccess();
+
+  // Scope check — throws if record doesn't exist or is outside caller's categories
+  await db.record.findFirstOrThrow({
+    where: { id: recordId, project: { categoryId: { in: accessibleCategoryIds } } },
+    select: { id: true },
+  });
+
   await writeAudit({
     action: AuditAction.RECORD_DELETED,
     resource: "record",
@@ -253,6 +267,21 @@ export async function revealAuditValues(auditEventId: string): Promise<AuditPrev
 }
 
 export async function moveRecord(recordId: string, fromProjectId: string, toProjectId: string) {
+  const { accessibleCategoryIds } = await requireAccess();
+
+  // Verify source record is within caller's scope
+  await db.record.findFirstOrThrow({
+    where: { id: recordId, project: { categoryId: { in: accessibleCategoryIds } } },
+    select: { id: true },
+  });
+
+  // Verify destination project is within caller's scope
+  const destProject = await db.project.findFirst({
+    where: { id: toProjectId, categoryId: { in: accessibleCategoryIds } },
+    select: { id: true },
+  });
+  if (!destProject) throw new Error("Unauthorized");
+
   await db.record.update({ where: { id: recordId }, data: { projectId: toProjectId } });
   await writeAudit({
     action: AuditAction.RECORD_UPDATED,
