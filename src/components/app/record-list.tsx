@@ -896,6 +896,17 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
             <Button variant="outline" onClick={() => setOpenNote(null)}>
               Close
             </Button>
+            <Button
+              onClick={() => {
+                const record = records.find((r) => r.id === openNote?.id);
+                if (!record) return;
+                setOpenNote(null);
+                handleEditClick(record);
+              }}
+            >
+              <PencilLine className="size-4" />
+              Edit note
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
