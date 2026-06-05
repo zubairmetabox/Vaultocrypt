@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   AlertCircle,
   ArchiveRestore,
@@ -47,20 +47,36 @@ export function ArchivedRecordsSection({ projectId, initialRecords, isAdmin }: P
   const [records, setRecords] = useState(initialRecords);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ArchivedRecordRow | null>(null);
-  const [isRestoring, startRestore] = useTransition();
-  const [isDeleting, startDelete] = useTransition();
 
-  if (records.length === 0) return null;
+  // Per-row loading state — independent of transition so the row stays
+  // visible with its spinner until the server re-renders with fresh data.
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [, startRestore] = useTransition();
+  const [, startDelete] = useTransition();
+
+  // Sync local list and clear loading state once router.refresh() completes
+  // and the parent server component passes updated initialRecords as props.
+  useEffect(() => {
+    setRecords(initialRecords);
+    setRestoringId(null);
+    setDeletingId(null);
+  }, [initialRecords]);
+
+  if (records.length === 0 && !restoringId && !deletingId) return null;
 
   function handleRestore(record: ArchivedRecordRow) {
     setError(null);
+    setRestoringId(record.id);
     startRestore(async () => {
       try {
         await restoreRecord(record.id, projectId);
-        setRecords((prev) => prev.filter((r) => r.id !== record.id));
         router.refresh();
+        // Row stays visible with spinner until useEffect fires after refresh
       } catch {
         setError("Failed to restore record. Please try again.");
+        setRestoringId(null);
       }
     });
   }
@@ -69,14 +85,16 @@ export function ArchivedRecordsSection({ projectId, initialRecords, isAdmin }: P
     if (!confirmDelete) return;
     const target = confirmDelete;
     setError(null);
+    setDeletingId(target.id);
+    setConfirmDelete(null);
     startDelete(async () => {
       try {
         await permanentlyDeleteRecord(target.id, projectId);
-        setRecords((prev) => prev.filter((r) => r.id !== target.id));
-        setConfirmDelete(null);
         router.refresh();
+        // Row stays visible with spinner until useEffect fires after refresh
       } catch {
         setError("Failed to delete record. Please try again.");
+        setDeletingId(null);
       }
     });
   }
@@ -110,52 +128,63 @@ export function ArchivedRecordsSection({ projectId, initialRecords, isAdmin }: P
               </div>
             )}
             <div className="divide-y divide-border/50">
-              {records.map((record) => (
-                <div
-                  key={record.id}
-                  className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground/80">{record.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {record.serviceName ?? record.username ?? record.type.toLowerCase().replace("_", " ")}
-                      {" · "}Archived {formatDate(record.archivedAt)}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleRestore(record)}
-                      disabled={isRestoring || isDeleting}
-                    >
-                      {isRestoring ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <ArchiveRestore className="size-3.5" />
-                      )}
-                      Restore
-                    </Button>
-                    {isAdmin && (
+              {records.map((record) => {
+                const isThisRestoring = restoringId === record.id;
+                const isThisDeleting = deletingId === record.id;
+                const isThisBusy = isThisRestoring || isThisDeleting;
+                const anyBusy = restoringId !== null || deletingId !== null;
+
+                return (
+                  <div
+                    key={record.id}
+                    className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground/80">{record.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {record.serviceName ?? record.username ?? record.type.toLowerCase().replace("_", " ")}
+                        {" · "}Archived {formatDate(record.archivedAt)}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1.5">
                       <Button
-                        size="icon"
-                        variant="ghost"
-                        className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => setConfirmDelete(record)}
-                        disabled={isRestoring || isDeleting}
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRestore(record)}
+                        disabled={anyBusy}
                       >
-                        <Trash2 className="size-3.5" />
+                        {isThisRestoring ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <ArchiveRestore className="size-3.5" />
+                        )}
+                        {isThisRestoring ? "Restoring…" : "Restore"}
                       </Button>
-                    )}
+                      {isAdmin && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => setConfirmDelete(record)}
+                          disabled={anyBusy}
+                        >
+                          {isThisDeleting ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="size-3.5" />
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         )}
       </Card>
 
-      <Dialog open={!!confirmDelete} onOpenChange={(o) => { if (!isDeleting) setConfirmDelete(o ? confirmDelete : null); }}>
+      <Dialog open={!!confirmDelete} onOpenChange={(o) => { if (!deletingId) setConfirmDelete(o ? confirmDelete : null); }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Permanently delete record?</DialogTitle>
@@ -165,11 +194,10 @@ export function ArchivedRecordsSection({ projectId, initialRecords, isAdmin }: P
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmDelete(null)} disabled={isDeleting}>
+            <Button variant="outline" onClick={() => setConfirmDelete(null)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handlePermanentDelete} disabled={isDeleting}>
-              {isDeleting && <Loader2 className="size-4 animate-spin" />}
+            <Button variant="destructive" onClick={handlePermanentDelete}>
               Delete permanently
             </Button>
           </DialogFooter>
