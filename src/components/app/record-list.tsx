@@ -341,6 +341,15 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
       ),
     );
 
+    // Keep revealedSecrets in sync so the inline preview updates immediately
+    if (draft.type === "secure_note") {
+      if (draft.encryptNote) {
+        setRevealedSecrets((prev) => new Map(prev).set(snapshot.id, draft.notes));
+      } else {
+        setRevealedSecrets((prev) => { const n = new Map(prev); n.delete(snapshot.id); return n; });
+      }
+    }
+
     startEdit(async () => {
       try {
         await updateRecord(snapshot.id, projectId, {
