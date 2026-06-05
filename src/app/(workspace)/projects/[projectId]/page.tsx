@@ -38,6 +38,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     username: record.username,
     notes: record.notes,
     hasEncryptedContent: Boolean(record.secretCipher),
+    createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   }));
 

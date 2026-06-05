@@ -52,6 +52,7 @@ import { safeUrl } from "@/lib/utils";
 
 export type RecordItem = RecordFormInput & {
   id: string;
+  createdAt: Date;
   updatedAt: Date;
 };
 
@@ -256,6 +257,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
         username: draft.username || null,
         notes: draft.type === "secure_note" && !draft.encryptNote ? draft.notes || null : null,
         hasEncryptedContent: draft.type === "secure_note" ? draft.encryptNote : Boolean(draft.secretValue),
+        createdAt: new Date(),
         updatedAt: new Date(),
       },
       ...prev,
@@ -306,7 +308,8 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
               username: draft.username || null,
               notes: draft.type === "secure_note" && !draft.encryptNote ? draft.notes || null : null,
               hasEncryptedContent: draft.type === "secure_note" ? draft.encryptNote : Boolean(draft.secretValue),
-              updatedAt: new Date(),
+              createdAt: new Date(),
+        updatedAt: new Date(),
             }
           : r,
       ),
@@ -467,6 +470,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
               const secretDisplay = isRevealed ? (secret || "—") : "•".repeat(18);
 
               const isSelected = selectedIds.has(record.id);
+              const hasBeenEdited = record.updatedAt.getTime() - record.createdAt.getTime() > 2000;
 
               return (
                 <div
@@ -584,8 +588,9 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                         </p>
                         {!isOptimistic && (
                           <button
-                            onClick={() => setHistoryRecord({ id: record.id, title: record.title })}
-                            className="flex items-center gap-1 text-xs text-muted-foreground/50 transition-colors hover:text-muted-foreground"
+                            onClick={() => hasBeenEdited && setHistoryRecord({ id: record.id, title: record.title })}
+                            disabled={!hasBeenEdited}
+                            className={`flex items-center gap-1 text-xs transition-colors ${hasBeenEdited ? "text-muted-foreground/50 hover:text-muted-foreground" : "cursor-default text-muted-foreground/20"}`}
                           >
                             <History className="size-3" />
                             History
@@ -674,10 +679,10 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="size-8"
-                        title="View change history"
-                        onClick={() => setHistoryRecord({ id: record.id, title: record.title })}
-                        disabled={isOptimistic}
+                        className={`size-8 ${!hasBeenEdited ? "cursor-default opacity-25" : ""}`}
+                        title={hasBeenEdited ? "View change history" : "No history yet"}
+                        onClick={() => hasBeenEdited && setHistoryRecord({ id: record.id, title: record.title })}
+                        disabled={isOptimistic || !hasBeenEdited}
                       >
                         <History className="size-4" />
                       </Button>
