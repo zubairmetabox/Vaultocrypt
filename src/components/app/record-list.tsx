@@ -46,6 +46,7 @@ import type { CategoryWithProjects } from "@/lib/actions/categories";
 import type { RecordDraft, RecordFormInput } from "@/components/app/record-form-dialog";
 import { useSearch } from "@/contexts/search";
 import { useRole } from "@/contexts/role";
+import { safeUrl } from "@/lib/utils";
 
 export type RecordItem = RecordFormInput & {
   id: string;
@@ -536,7 +537,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                               <div className="flex items-baseline gap-2">
                                 <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">URL</span>
                                 <a
-                                  href={record.url.startsWith("http") ? record.url : `https://${record.url}`}
+                                  href={safeUrl(record.url)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   onClick={(e) => e.stopPropagation()}

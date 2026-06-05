@@ -53,10 +53,17 @@ export async function getRecords(projectId: string): Promise<RecordRow[]> {
  * Must only be called from a server action; never exposed to the client directly.
  */
 export async function revealSecret(recordId: string): Promise<string> {
+  const { getCurrentRole } = await import("@/lib/auth/get-role");
+  const role = await getCurrentRole();
+  if (role === "NONE") throw new Error("Unauthorized");
+
   const record = await db.record.findUniqueOrThrow({
     where: { id: recordId },
-    select: { secretCipher: true, projectId: true, title: true },
+    select: { secretCipher: true, projectId: true, title: true, isRestricted: true },
   });
+
+  if (record.isRestricted && role !== "ADMIN") throw new Error("Unauthorized");
+
   await writeAudit({
     action: AuditAction.SECRET_REVEALED,
     resource: "record",
@@ -70,10 +77,17 @@ export async function revealSecret(recordId: string): Promise<string> {
 
 /** Privileged action — logs SECRET_COPIED then returns the decrypted value for clipboard use. */
 export async function copySecret(recordId: string): Promise<string> {
+  const { getCurrentRole } = await import("@/lib/auth/get-role");
+  const role = await getCurrentRole();
+  if (role === "NONE") throw new Error("Unauthorized");
+
   const record = await db.record.findUniqueOrThrow({
     where: { id: recordId },
-    select: { secretCipher: true, projectId: true, title: true },
+    select: { secretCipher: true, projectId: true, title: true, isRestricted: true },
   });
+
+  if (record.isRestricted && role !== "ADMIN") throw new Error("Unauthorized");
+
   await writeAudit({
     action: AuditAction.SECRET_COPIED,
     resource: "record",

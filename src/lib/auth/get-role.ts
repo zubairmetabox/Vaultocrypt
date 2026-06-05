@@ -42,28 +42,32 @@ export async function getCurrentRole(): Promise<AppRole> {
         }
       }
 
-      // 3. Bootstrap: no admins exist yet - make this user the first admin
+      // 3. Bootstrap: no admins exist yet — make this user the first admin.
+      // Wrapped in a SERIALIZABLE transaction to prevent two simultaneous
+      // first-logins both reading adminCount=0 and both becoming ADMIN.
       if (!user) {
-        const adminCount = await prisma.user.count({ where: { role: "ADMIN" } });
+        const clerkUser2 = clerkUser ?? (await currentUser());
+        const email =
+          clerkUser2?.emailAddresses.find(
+            (emailAddress) => emailAddress.id === clerkUser2?.primaryEmailAddressId,
+          )?.emailAddress ?? null;
 
-        if (adminCount === 0) {
-          const clerkUser2 = clerkUser ?? (await currentUser());
-          const email =
-            clerkUser2?.emailAddresses.find(
-              (emailAddress) => emailAddress.id === clerkUser2.primaryEmailAddressId,
-            )?.emailAddress ?? null;
-
-          user = await prisma.user.create({
-            data: {
-              clerkUserId,
-              email,
-              firstName: clerkUser2?.firstName ?? null,
-              lastName: clerkUser2?.lastName ?? null,
-              role: "ADMIN",
-            },
-            select: { id: true, role: true },
-          });
-        }
+        user = await prisma.$transaction(async (tx) => {
+          const adminCount = await tx.user.count({ where: { role: "ADMIN" } });
+          if (adminCount === 0) {
+            return tx.user.create({
+              data: {
+                clerkUserId,
+                email,
+                firstName: clerkUser2?.firstName ?? null,
+                lastName: clerkUser2?.lastName ?? null,
+                role: "ADMIN",
+              },
+              select: { id: true, role: true },
+            });
+          }
+          return null;
+        }, { isolationLevel: "Serializable" });
 
         // Admins exist but this person was never invited - block them
         if (!user) return "NONE";

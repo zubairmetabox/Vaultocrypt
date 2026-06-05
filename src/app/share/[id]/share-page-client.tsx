@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { verifySharePassword, revealSharedSecret, checkBundleStatus, type VerifyResult } from "@/lib/actions/sharing";
+import { safeUrl } from "@/lib/utils";
 
 type VerifiedRecord = Extract<VerifyResult, { ok: true }>["records"][number];
 
@@ -303,7 +304,7 @@ export function SharePageClient({ bundleId }: SharePageClientProps) {
                         <div className="flex items-baseline gap-2">
                           <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">URL</span>
                           <a
-                            href={record.url.startsWith("http") ? record.url : `https://${record.url}`}
+                            href={safeUrl(record.url)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="min-w-0 truncate text-sm text-foreground hover:underline"

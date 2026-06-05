@@ -43,6 +43,7 @@ enum AuditAction {
   SHARE_CREATED
   SHARE_REVEALED
   SHARE_EXPIRED
+  DATA_EXPORTED
 }
 
 model Category {

@@ -55,6 +55,7 @@ const ACTION_META: Record<
   SHARE_REVEALED:      { label: "share secret revealed",  icon: Eye,        tone: "secondary",   category: "Secrets"  },
   SHARE_CREATED:       { label: "created share link for", icon: Link2,      tone: "outline",     category: "Sharing"  },
   SHARE_EXPIRED:       { label: "expired share link for", icon: Link2Off,   tone: "destructive", category: "Sharing"  },
+  DATA_EXPORTED:       { label: "exported all vault data", icon: KeyRound,   tone: "destructive", category: "Auth"     },
   LOGIN:               { label: "signed in",              icon: LogIn,      tone: "outline",     category: "Auth"     },
   FAILED_LOGIN:        { label: "failed sign-in",         icon: ShieldAlert,tone: "destructive", category: "Auth"     },
   ROLE_CHANGED:        { label: "changed role for",       icon: UserCog,    tone: "outline",     category: "Auth"     },

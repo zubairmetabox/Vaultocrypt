@@ -51,6 +51,7 @@ const ACTION_META: Record<
   SHARE_CREATED: { label: "created share link", icon: ArrowRightLeft, tone: "outline" },
   SHARE_REVEALED: { label: "share secret revealed", icon: Eye, tone: "secondary" },
   SHARE_EXPIRED: { label: "expired share link", icon: ShieldCheck, tone: "destructive" },
+  DATA_EXPORTED: { label: "exported vault data", icon: ShieldCheck, tone: "destructive" },
 };
 
 function formatUpdated(date: Date): string {

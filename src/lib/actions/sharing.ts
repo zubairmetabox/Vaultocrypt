@@ -320,8 +320,9 @@ export async function revealSharedSecret(
 
   // Capture IP + user-agent for the audit trail
   const h = await headers();
-  const ip = h.get("x-forwarded-for") ?? h.get("x-real-ip") ?? "unknown";
-  const userAgent = h.get("user-agent") ?? "unknown";
+  const rawIp = h.get("x-forwarded-for") ?? h.get("x-real-ip") ?? "unknown";
+  const ip = rawIp.split(",")[0].trim().slice(0, 45); // take leftmost, cap at max IPv6 length
+  const userAgent = h.get("user-agent")?.slice(0, 512) ?? "unknown";
 
   await db.auditEvent.create({
     data: {

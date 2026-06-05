@@ -28,10 +28,8 @@ export function parseCsvText(text: string): ParsedCsvFile {
   // parses the row. Only throw on structural errors like bad quoting.
   const fatalErrors = result.errors.filter((e) => e.type !== "FieldMismatch");
   if (fatalErrors.length > 0) {
-    const firstError = fatalErrors[0];
-    throw new Error(
-      `CSV parse error on row ${firstError.row ?? "unknown"}: ${firstError.message}`,
-    );
+    console.error("[csv] Parse error:", fatalErrors[0]);
+    throw new Error("The CSV file could not be parsed. Please check the file format and try again.");
   }
 
   const headers = (result.meta.fields ?? []).map((header) => header.trim());

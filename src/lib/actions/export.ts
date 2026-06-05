@@ -1,8 +1,11 @@
 "use server";
 
+import { AuditAction } from "@prisma/client";
+
 import { getCurrentRole } from "@/lib/auth/get-role";
 import { decrypt } from "@/lib/crypto";
 import { prisma } from "@/lib/db";
+import { writeAudit } from "@/lib/audit";
 
 function csvCell(value: string | null | undefined): string {
   const s = String(value ?? "");
@@ -95,5 +98,14 @@ export async function exportAllRecords(): Promise<string> {
     }
   }
 
-  return rows.join("\n");
+  const csv = rows.join("\n");
+
+  await writeAudit({
+    action: AuditAction.DATA_EXPORTED,
+    resource: "export",
+    resourceId: "all_records",
+    metadata: { rowCount: rows.length - 1 },
+  });
+
+  return csv;
 }

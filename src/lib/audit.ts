@@ -70,7 +70,8 @@ export async function writeAudit(params: WriteAuditParams): Promise<void> {
         metadata: params.metadata as object | undefined,
       },
     });
-  } catch {
-    // Audit failures must never break the main operation
+  } catch (err) {
+    // Audit failures must never break the main operation, but they must be visible in logs
+    console.error("[audit] Failed to write audit event:", params.action, params.resourceId, err);
   }
 }
