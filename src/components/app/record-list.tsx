@@ -11,6 +11,7 @@ import {
   EyeOff,
   Expand,
   FileText,
+  History,
   KeyRound,
   Loader2,
   PencilLine,
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { MoveRecordDialog } from "@/components/app/move-record-dialog";
+import { RecordHistoryModal } from "@/components/app/record-history-modal";
 import { RecordFormDialog } from "@/components/app/record-form-dialog";
 import { ShareModal } from "@/components/app/share-modal";
 import { Badge } from "@/components/ui/badge";
@@ -121,6 +123,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
   const [openNote, setOpenNote] = useState<OpenNoteState>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [shareOpen, setShareOpen] = useState(false);
+  const [historyRecord, setHistoryRecord] = useState<{ id: string; title: string } | null>(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function handleReveal(record: RecordItem) {
@@ -657,6 +660,17 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                         Edit
                       </Button>
 
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="size-8"
+                        title="View change history"
+                        onClick={() => setHistoryRecord({ id: record.id, title: record.title })}
+                        disabled={isOptimistic}
+                      >
+                        <History className="size-4" />
+                      </Button>
+
                       {isAdmin && categories && categories.length > 0 && (
                         <Button
                           size="sm"
@@ -788,6 +802,14 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
         selectedRecords={records
           .filter((r) => selectedIds.has(r.id))
           .map((r) => ({ id: r.id, title: r.title, type: r.type }))}
+      />
+
+      <RecordHistoryModal
+        open={Boolean(historyRecord)}
+        onOpenChange={(open) => { if (!open) setHistoryRecord(null); }}
+        recordId={historyRecord?.id ?? ""}
+        recordTitle={historyRecord?.title ?? ""}
+        isAdmin={isAdmin}
       />
 
       {categories && moveTarget && (

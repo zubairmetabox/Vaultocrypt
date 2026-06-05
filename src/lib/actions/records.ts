@@ -379,3 +379,70 @@ export async function moveRecord(recordId: string, fromProjectId: string, toProj
   revalidatePath(`/projects/${fromProjectId}`);
   revalidatePath(`/projects/${toProjectId}`);
 }
+
+// ─── History ──────────────────────────────────────────────────────────────────
+
+export type RecordHistoryEntry = {
+  id: string;
+  createdAt: Date;
+  actorName: string | null;
+  updatedFields: string[];
+  prev: {
+    title: string | null;
+    username: string | null;
+    url: string | null;
+    serviceName: string | null;
+    notes: string | null;
+    hasPrevSecret: boolean;
+  };
+};
+
+/** Returns the ordered change history for a record (RECORD_UPDATED events with prev values). */
+export async function getRecordHistory(recordId: string): Promise<RecordHistoryEntry[]> {
+  const { accessibleCategoryIds } = await requireAccess();
+
+  await db.record.findFirstOrThrow({
+    where: { id: recordId, project: { categoryId: { in: accessibleCategoryIds } } },
+    select: { id: true },
+  });
+
+  const events = await db.auditEvent.findMany({
+    where: { recordId, action: AuditAction.RECORD_UPDATED },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      createdAt: true,
+      metadata: true,
+      actor: { select: { firstName: true, lastName: true, email: true } },
+    },
+  });
+
+  return events
+    .map((e) => {
+      const meta = (e.metadata ?? {}) as Record<string, unknown>;
+      // Skip move events — they have movedToProjectId but no prev field snapshot
+      if (meta.movedToProjectId) return null;
+      const prev = (meta.prev ?? null) as Record<string, unknown> | null;
+      if (!prev) return null;
+
+      const updatedFields = (meta.updatedFields as string[] | undefined) ?? [];
+
+      return {
+        id: e.id,
+        createdAt: e.createdAt,
+        actorName: e.actor
+          ? [e.actor.firstName, e.actor.lastName].filter(Boolean).join(" ") || e.actor.email || null
+          : null,
+        updatedFields,
+        prev: {
+          title: (prev.title as string | null) ?? null,
+          username: (prev.username as string | null) ?? null,
+          url: (prev.url as string | null) ?? null,
+          serviceName: (prev.serviceName as string | null) ?? null,
+          notes: (prev.notes as string | null) ?? null,
+          hasPrevSecret: Boolean(prev.secretCipher),
+        },
+      };
+    })
+    .filter((e): e is RecordHistoryEntry => e !== null);
+}
