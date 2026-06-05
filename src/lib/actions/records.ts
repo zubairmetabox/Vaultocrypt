@@ -20,6 +20,7 @@ export type RecordRow = {
   notes: string | null;
   sensitivity: "STANDARD" | "SENSITIVE";
   isRestricted: boolean;
+  hasHistory: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -65,6 +66,7 @@ export async function getRecords(projectId: string): Promise<RecordRow[]> {
       notes: true,
       sensitivity: true,
       isRestricted: true,
+      hasHistory: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -184,6 +186,7 @@ export async function updateRecord(recordId: string, projectId: string, input: U
   const record = await db.record.update({
     where: { id: recordId },
     data: {
+      hasHistory: true,
       ...(input.title !== undefined && { title: input.title.trim() }),
       ...(input.type !== undefined && { type: input.type as RecordType }),
       ...(input.serviceName !== undefined && { serviceName: input.serviceName.trim() || null }),

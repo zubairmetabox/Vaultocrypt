@@ -52,6 +52,7 @@ import { safeUrl } from "@/lib/utils";
 
 export type RecordItem = RecordFormInput & {
   id: string;
+  hasHistory: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -257,6 +258,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
         username: draft.username || null,
         notes: draft.type === "secure_note" && !draft.encryptNote ? draft.notes || null : null,
         hasEncryptedContent: draft.type === "secure_note" ? draft.encryptNote : Boolean(draft.secretValue),
+        hasHistory: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -308,7 +310,8 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
               username: draft.username || null,
               notes: draft.type === "secure_note" && !draft.encryptNote ? draft.notes || null : null,
               hasEncryptedContent: draft.type === "secure_note" ? draft.encryptNote : Boolean(draft.secretValue),
-              createdAt: new Date(),
+              hasHistory: false,
+        createdAt: new Date(),
         updatedAt: new Date(),
             }
           : r,
@@ -470,7 +473,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
               const secretDisplay = isRevealed ? (secret || "—") : "•".repeat(18);
 
               const isSelected = selectedIds.has(record.id);
-              const hasBeenEdited = record.updatedAt.getTime() - record.createdAt.getTime() > 2000;
+              const hasBeenEdited = record.hasHistory;
 
               return (
                 <div

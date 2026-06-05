@@ -89,6 +89,7 @@ export async function getProjectWithRecords(projectId: string) {
           notes: true,
           sensitivity: true,
           isRestricted: true,
+          hasHistory: true,
           createdAt: true,
           updatedAt: true,
         },
