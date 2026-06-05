@@ -7,8 +7,6 @@ import {
   AlertCircle,
   ClipboardCheck,
   Copy,
-  Eye,
-  EyeOff,
   Loader2,
   ShieldOff,
 } from "lucide-react";
@@ -78,7 +76,6 @@ function expiryLabel(bundle: BundleDetail): string {
 
 export function BundleDetailsCard({ bundle }: Props) {
   const router = useRouter();
-  const [showPassword, setShowPassword] = useState(false);
   const [confirmExpire, setConfirmExpire] = useState(false);
   const [isExpiring, startExpire] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +93,6 @@ export function BundleDetailsCard({ bundle }: Props) {
   }, [bundle.projectName, setTitle]);
 
   const urlClip = useClipboard();
-  const pwClip = useClipboard();
 
   function handleExpire() {
     setError(null);
@@ -152,28 +148,6 @@ export function BundleDetailsCard({ bundle }: Props) {
               </code>
               <Button size="sm" variant="outline" className="shrink-0" onClick={() => urlClip.copy(shareUrl)}>
                 {urlClip.copied ? <ClipboardCheck className="size-4 text-primary" /> : <Copy className="size-4" />}
-              </Button>
-            </div>
-          </div>
-
-          {/* Password */}
-          <div className="space-y-1.5">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Password</p>
-            <div className="flex items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded-[0.875rem] border border-border/70 bg-muted/50 px-3 py-2 font-mono text-xs text-foreground">
-                {showPassword ? bundle.password : "•".repeat(bundle.password.length)}
-              </code>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-8 shrink-0"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </Button>
-              <Button size="sm" variant="outline" className="shrink-0" onClick={() => pwClip.copy(bundle.password)}>
-                {pwClip.copied ? <ClipboardCheck className="size-4 text-primary" /> : <Copy className="size-4" />}
               </Button>
             </div>
           </div>

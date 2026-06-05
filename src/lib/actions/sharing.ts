@@ -1,11 +1,11 @@
 "use server";
 
-import { timingSafeEqual, randomBytes } from "crypto";
+import { timingSafeEqual, randomBytes, scryptSync } from "crypto";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { AuditAction } from "@prisma/client";
 
-import { decrypt, encrypt } from "@/lib/crypto";
+import { decrypt } from "@/lib/crypto";
 import { prisma as db } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 
@@ -43,11 +43,21 @@ function generateSharePassword(): string {
   return chars.join("");
 }
 
-function safeCompare(a: string, b: string): boolean {
-  const bufA = Buffer.from(a, "utf8");
-  const bufB = Buffer.from(b, "utf8");
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
+function hashPassword(password: string): string {
+  const salt = randomBytes(32).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password: string, stored: string): boolean {
+  const [salt, expectedHex] = stored.split(":");
+  if (!salt || !expectedHex) return false;
+  const expected = Buffer.from(expectedHex, "hex");
+  const actual = scryptSync(password, salt, 64);
+  const len = Math.max(expected.length, actual.length);
+  const paddedExpected = Buffer.concat([expected, Buffer.alloc(len - expected.length)]);
+  const paddedActual = Buffer.concat([actual, Buffer.alloc(len - actual.length)]);
+  return timingSafeEqual(paddedExpected, paddedActual) && expected.length === actual.length;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -116,7 +126,7 @@ export async function createSharedBundle(
   if (records.length !== recordIds.length) throw new Error("Invalid record selection");
 
   const password = generateSharePassword();
-  const passwordCipher = encrypt(password);
+  const passwordHash = hashPassword(password);
   const expiresAt = expiryToDate(expiry);
 
   const bundle = await db.sharedBundle.create({
@@ -124,7 +134,7 @@ export async function createSharedBundle(
       createdById: user.id,
       projectId,
       recordIds,
-      passwordCipher,
+      passwordHash,
       expiresAt,
     },
   });
@@ -203,7 +213,7 @@ export async function verifySharePassword(bundleId: string, password: string): P
   const bundle = await db.sharedBundle.findUnique({
     where: { id: bundleId },
     select: {
-      passwordCipher: true,
+      passwordHash: true,
       expiresAt: true,
       expiredManually: true,
       recordIds: true,
@@ -214,8 +224,7 @@ export async function verifySharePassword(bundleId: string, password: string): P
   if (!bundle) return { ok: false, reason: "expired" };
   if (!isBundleActive(bundle)) return { ok: false, reason: "expired" };
 
-  const storedPassword = decrypt(bundle.passwordCipher);
-  if (!safeCompare(password, storedPassword)) return { ok: false, reason: "invalid" };
+  if (!verifyPassword(password, bundle.passwordHash)) return { ok: false, reason: "invalid" };
 
   const records = await db.record.findMany({
     where: { id: { in: bundle.recordIds } },
@@ -264,7 +273,7 @@ export async function revealSharedSecret(
   const bundle = await db.sharedBundle.findUnique({
     where: { id: bundleId },
     select: {
-      passwordCipher: true,
+      passwordHash: true,
       expiresAt: true,
       expiredManually: true,
       recordIds: true,
@@ -274,8 +283,7 @@ export async function revealSharedSecret(
 
   if (!bundle || !isBundleActive(bundle)) throw new Error("Link has expired");
 
-  const storedPassword = decrypt(bundle.passwordCipher);
-  if (!safeCompare(password, storedPassword)) throw new Error("Invalid password");
+  if (!verifyPassword(password, bundle.passwordHash)) throw new Error("Invalid password");
 
   if (!bundle.recordIds.includes(recordId)) throw new Error("Record not in bundle");
 
@@ -381,7 +389,6 @@ export type BundleRecord = {
 };
 
 export type BundleDetail = SharedBundleRow & {
-  password: string;
   sharedRecords: BundleRecord[];
   auditEvents: {
     id: string;
@@ -442,8 +449,6 @@ export async function getSharedBundleDetail(bundleId: string): Promise<BundleDet
     select: { id: true, action: true, createdAt: true, metadata: true, recordId: true },
   });
 
-  const password = decrypt(bundle.passwordCipher);
-
   return {
     id: bundle.id,
     projectId: bundle.projectId,
@@ -458,7 +463,6 @@ export async function getSharedBundleDetail(bundleId: string): Promise<BundleDet
       [bundle.createdBy.firstName, bundle.createdBy.lastName].filter(Boolean).join(" ") ||
       bundle.createdBy.email ||
       "Unknown",
-    password,
     auditEvents: auditEvents.map((e) => {
       const meta = (e.metadata ?? {}) as Record<string, unknown>;
       return {

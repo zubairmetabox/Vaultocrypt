@@ -169,7 +169,7 @@ model SharedBundle {
   createdById     String
   projectId       String
   recordIds       String[]
-  passwordCipher  String
+  passwordHash    String
   expiresAt       DateTime?
   expiredManually Boolean   @default(false)
   createdAt       DateTime  @default(now())
