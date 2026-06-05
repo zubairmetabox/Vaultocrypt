@@ -139,6 +139,12 @@ export async function getCategories(): Promise<CategoryWithProjects[]> {
 }
 
 export async function getProjectsByCategory(categoryId: string) {
+  const role = await getCurrentRole();
+  if (role === "NONE") throw new Error("Unauthorized");
+
+  const accessibleCategoryIds = await getAccessibleCategoryIds();
+  if (!accessibleCategoryIds.includes(categoryId)) throw new Error("Unauthorized");
+
   return db.category.findUnique({
     where: { id: categoryId },
     include: {

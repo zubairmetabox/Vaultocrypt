@@ -3,6 +3,8 @@
 import { AuditAction } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
+import { getCurrentRole } from "@/lib/auth/get-role";
+import { getAccessibleCategoryIds } from "@/lib/actions/categories";
 
 export type ProjectAuditEventRow = {
   id: string;
@@ -21,6 +23,16 @@ export type ProjectAuditEventRow = {
 };
 
 export async function getProjectAuditEvents(projectId: string, offset = 0, limit = 10): Promise<ProjectAuditEventRow[]> {
+  const role = await getCurrentRole();
+  if (role === "NONE") throw new Error("Unauthorized");
+
+  const accessibleCategoryIds = await getAccessibleCategoryIds();
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, categoryId: { in: accessibleCategoryIds } },
+    select: { id: true },
+  });
+  if (!project) throw new Error("Unauthorized");
+
   const rows = await prisma.auditEvent.findMany({
     where: { projectId },
     orderBy: { createdAt: "desc" },

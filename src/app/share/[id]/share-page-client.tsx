@@ -71,6 +71,8 @@ export function SharePageClient({ bundleId }: SharePageClientProps) {
       if (!result.ok) {
         if (result.reason === "expired") {
           setExpired(true);
+        } else if (result.reason === "locked") {
+          setVerifyError("Too many failed attempts. This link is locked for 15 minutes.");
         } else {
           setVerifyError("Incorrect password. Please check and try again.");
         }

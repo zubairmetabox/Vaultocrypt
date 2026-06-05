@@ -207,13 +207,18 @@ export async function checkBundleStatus(bundleId: string): Promise<{ active: boo
 
 export type VerifyResult =
   | { ok: true; projectName: string; expiresAt: Date | null; records: { id: string; title: string; type: string; hasSecret: boolean; username: string | null; url: string | null; serviceName: string | null; notes: string | null }[] }
-  | { ok: false; reason: "expired" | "invalid" };
+  | { ok: false; reason: "expired" | "invalid" | "locked" };
+
+const MAX_ATTEMPTS = 10;
+const LOCK_DURATION_MS = 15 * 60 * 1000;
 
 export async function verifySharePassword(bundleId: string, password: string): Promise<VerifyResult> {
   const bundle = await db.sharedBundle.findUnique({
     where: { id: bundleId },
     select: {
       passwordHash: true,
+      failedAttempts: true,
+      lockedUntil: true,
       expiresAt: true,
       expiredManually: true,
       recordIds: true,
@@ -224,7 +229,28 @@ export async function verifySharePassword(bundleId: string, password: string): P
   if (!bundle) return { ok: false, reason: "expired" };
   if (!isBundleActive(bundle)) return { ok: false, reason: "expired" };
 
-  if (!verifyPassword(password, bundle.passwordHash)) return { ok: false, reason: "invalid" };
+  if (bundle.lockedUntil && bundle.lockedUntil > new Date()) {
+    return { ok: false, reason: "locked" };
+  }
+
+  if (!verifyPassword(password, bundle.passwordHash)) {
+    const newCount = bundle.failedAttempts + 1;
+    await db.sharedBundle.update({
+      where: { id: bundleId },
+      data: {
+        failedAttempts: newCount,
+        ...(newCount >= MAX_ATTEMPTS
+          ? { lockedUntil: new Date(Date.now() + LOCK_DURATION_MS) }
+          : {}),
+      },
+    });
+    return { ok: false, reason: "invalid" };
+  }
+
+  await db.sharedBundle.update({
+    where: { id: bundleId },
+    data: { failedAttempts: 0, lockedUntil: null },
+  });
 
   const records = await db.record.findMany({
     where: { id: { in: bundle.recordIds } },
