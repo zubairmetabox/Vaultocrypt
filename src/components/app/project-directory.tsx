@@ -48,7 +48,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useDraggable } from "@dnd-kit/core";
-import { createProject, deleteProjects, moveProjects, type ProjectRow } from "@/lib/actions/projects";
+import { createProject, archiveProjects, moveProjects, type ProjectRow } from "@/lib/actions/projects";
 import { importClients, type ImportClientInput } from "@/lib/actions/import";
 import { exportAllRecords } from "@/lib/actions/export";
 import type { CategoryRow } from "@/lib/actions/categories";
@@ -270,18 +270,18 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
     });
   }
 
-  // ── Delete ──────────────────────────────────────────────────────────────────
+  // ── Archive ─────────────────────────────────────────────────────────────────
 
   function handleDelete() {
     setDeleteError(null);
     startTransition(async () => {
       try {
-        await deleteProjects(selectedIds);
+        await archiveProjects(selectedIds);
         setSelectedIds([]);
         setDeleteOpen(false);
         router.refresh();
       } catch {
-        setDeleteError("Failed to delete projects. Please try again.");
+        setDeleteError("Failed to archive projects. Please try again.");
       }
     });
   }
@@ -378,16 +378,16 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
                     <DialogTrigger asChild>
                       <Button size="sm" variant="destructive">
                         <Trash2 className="size-4" />
-                        Delete
+                        Archive
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Delete selected projects</DialogTitle>
+                        <DialogTitle>Archive selected projects</DialogTitle>
                         <DialogDescription>
-                          Permanently remove {selectedIds.length} project
-                          {selectedIds.length === 1 ? "" : "s"} and all their records. This cannot
-                          be undone.
+                          Move {selectedIds.length} project
+                          {selectedIds.length === 1 ? "" : "s"} to the archive. Records are preserved
+                          and everything can be restored from Settings.
                         </DialogDescription>
                       </DialogHeader>
                       <DialogFooter>
@@ -396,7 +396,7 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
                         </Button>
                         <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
                           {isPending && <Loader2 className="size-4 animate-spin" />}
-                          Confirm delete
+                          Move to archive
                         </Button>
                       </DialogFooter>
                       {deleteError && (

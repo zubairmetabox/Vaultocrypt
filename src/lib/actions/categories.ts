@@ -99,6 +99,7 @@ export async function getCategories(): Promise<CategoryWithProjects[]> {
     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
     include: {
       projects: {
+        where: { archivedAt: null },
         orderBy: { name: "asc" },
         select: {
           id: true,
@@ -110,7 +111,7 @@ export async function getCategories(): Promise<CategoryWithProjects[]> {
           isRestricted: true,
           createdAt: true,
           updatedAt: true,
-          _count: { select: { records: true } },
+          _count: { select: { records: { where: { archivedAt: null } } } },
         },
       },
     },
@@ -149,9 +150,11 @@ export async function getProjectsByCategory(categoryId: string) {
     where: { id: categoryId },
     include: {
       projects: {
+        where: { archivedAt: null },
         orderBy: { name: "asc" },
         include: {
           records: {
+            where: { archivedAt: null },
             orderBy: { createdAt: "desc" },
             select: {
               id: true,

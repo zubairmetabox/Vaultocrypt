@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import { ProjectDetailsCard } from "@/components/app/project-details-card";
 import { ProjectAuditTrail } from "@/components/app/project-audit-trail";
 import { RecordList } from "@/components/app/record-list";
+import { ArchivedRecordsSection } from "@/components/app/archived-records-section";
 import { getCategories } from "@/lib/actions/categories";
 import { getProjectWithRecords } from "@/lib/actions/projects";
+import { getArchivedRecords } from "@/lib/actions/records";
 import { getCurrentRole } from "@/lib/auth/get-role";
 
 type ProjectPageProps = {
@@ -13,10 +15,11 @@ type ProjectPageProps = {
 
 export default async function ProjectPage({ params }: ProjectPageProps) {
   const { projectId } = await params;
-  const [project, categories, role] = await Promise.all([
+  const [project, categories, role, archivedRecords] = await Promise.all([
     getProjectWithRecords(projectId),
     getCategories(),
     getCurrentRole(),
+    getArchivedRecords(projectId),
   ]);
 
   if (!project) notFound();
@@ -51,6 +54,11 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           categories={categories}
         />
         <RecordList projectId={project.id} initialRecords={records} categories={categories} />
+        <ArchivedRecordsSection
+          projectId={project.id}
+          initialRecords={archivedRecords}
+          isAdmin={role === "ADMIN"}
+        />
       </div>
 
       <div className="self-start">

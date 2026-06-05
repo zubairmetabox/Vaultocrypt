@@ -35,9 +35,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  archiveRecord,
   copySecret,
   createRecord,
-  deleteRecord,
   revealSecret,
   updateRecord,
 } from "@/lib/actions/records";
@@ -351,8 +351,8 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
 
     startDelete(async () => {
       try {
-        await deleteRecord(targetId, projectId);
-        emitLiveAuditEvent({ action: "RECORD_DELETED", targetLabel: snapshot?.title ?? deleteTarget.title });
+        await archiveRecord(targetId, projectId);
+        emitLiveAuditEvent({ action: "RECORD_ARCHIVED", targetLabel: snapshot?.title ?? deleteTarget.title });
         setDeleteTarget(null);
         router.refresh();
       } catch {
@@ -726,10 +726,10 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete record</DialogTitle>
+            <DialogTitle>Archive record</DialogTitle>
             <DialogDescription>
-              Permanently remove{" "}
-              <span className="font-medium text-foreground">{deleteTarget?.title}</span> from this
+              Move{" "}
+              <span className="font-medium text-foreground">{deleteTarget?.title}</span> to the archive. It can be restored from the project page.
               project. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
@@ -754,7 +754,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
               {isDeleting && <Loader2 className="size-4 animate-spin" />}
-              Delete record
+              Move to archive
             </Button>
           </DialogFooter>
         </DialogContent>

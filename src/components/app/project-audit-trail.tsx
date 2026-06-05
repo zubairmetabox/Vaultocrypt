@@ -52,6 +52,10 @@ const ACTION_META: Record<
   SHARE_REVEALED: { label: "share secret revealed", icon: Eye, tone: "secondary" },
   SHARE_EXPIRED: { label: "expired share link", icon: ShieldCheck, tone: "destructive" },
   DATA_EXPORTED: { label: "exported vault data", icon: ShieldCheck, tone: "destructive" },
+  CLIENT_ARCHIVED: { label: "archived project", icon: Trash2, tone: "destructive" },
+  CLIENT_RESTORED: { label: "restored project", icon: Plus, tone: "outline" },
+  RECORD_ARCHIVED: { label: "archived record", icon: Trash2, tone: "destructive" },
+  RECORD_RESTORED: { label: "restored record", icon: Plus, tone: "outline" },
 };
 
 function formatUpdated(date: Date): string {

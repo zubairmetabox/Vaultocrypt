@@ -6,6 +6,8 @@ export type LiveAuditEvent = {
     | "RECORD_CREATED"
     | "RECORD_UPDATED"
     | "RECORD_DELETED"
+    | "RECORD_ARCHIVED"
+    | "RECORD_RESTORED"
     | "SECRET_REVEALED"
     | "SECRET_COPIED";
   createdAt?: string;

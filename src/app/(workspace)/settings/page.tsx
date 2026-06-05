@@ -1,10 +1,13 @@
-import { LockKeyhole, SunMoon, Users } from "lucide-react";
+import { Archive, LockKeyhole, SunMoon, Users } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
 
 import { TeamSettings } from "@/components/app/team-settings";
 import { ThemeToggle } from "@/components/app/theme-toggle";
+import { ProjectArchive } from "@/components/app/project-archive";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAdmins } from "@/lib/actions/users";
+import { getArchivedProjects } from "@/lib/actions/projects";
+import { getCurrentRole } from "@/lib/auth/get-role";
 import { prisma } from "@/lib/db";
 
 async function getCurrentUserId(): Promise<string | null> {
@@ -22,8 +25,17 @@ async function getCurrentUserId(): Promise<string | null> {
 }
 
 export default async function SettingsPage() {
-  const currentUserId = await getCurrentUserId();
-  const admins = await getAdmins(currentUserId);
+  const [currentUserId, role] = await Promise.all([
+    getCurrentUserId(),
+    getCurrentRole(),
+  ]);
+
+  const isAdmin = role === "ADMIN";
+
+  const [admins, archivedProjects] = await Promise.all([
+    getAdmins(currentUserId),
+    isAdmin ? getArchivedProjects() : Promise.resolve([]),
+  ]);
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -68,6 +80,24 @@ export default async function SettingsPage() {
           </p>
         </CardContent>
       </Card>
+
+      {isAdmin && (
+        <Card className="border-border/70 lg:col-span-2">
+          <CardHeader>
+            <div className="flex size-11 items-center justify-center rounded-[1.25rem] bg-muted">
+              <Archive className="size-4" />
+            </div>
+            <CardTitle className="mt-3">Project archive</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 max-w-3xl text-sm leading-6 text-muted-foreground">
+              Archived projects and all their records are preserved here. Restore a project to make
+              it active again, or permanently delete it to free the data.
+            </p>
+            <ProjectArchive initialProjects={archivedProjects} />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

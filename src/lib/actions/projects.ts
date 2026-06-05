@@ -23,6 +23,18 @@ export type ProjectRow = {
   updatedAt: Date;
 };
 
+export type ArchivedProjectRow = {
+  id: string;
+  name: string;
+  contact: string | null;
+  vertical: string | null;
+  status: "ACTIVE" | "INACTIVE";
+  categoryId: string | null;
+  categoryName: string | null;
+  recordCount: number;
+  archivedAt: Date;
+};
+
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export async function getProjects(): Promise<ProjectRow[]> {
@@ -30,7 +42,7 @@ export async function getProjects(): Promise<ProjectRow[]> {
   if (accessibleCategoryIds.length === 0) return [];
 
   const rows = await db.project.findMany({
-    where: { categoryId: { in: accessibleCategoryIds } },
+    where: { categoryId: { in: accessibleCategoryIds }, archivedAt: null },
     orderBy: { name: "asc" },
     select: {
       id: true,
@@ -42,7 +54,7 @@ export async function getProjects(): Promise<ProjectRow[]> {
       isRestricted: true,
       createdAt: true,
       updatedAt: true,
-      _count: { select: { records: true } },
+      _count: { select: { records: { where: { archivedAt: null } } } },
     },
   });
 
@@ -61,9 +73,10 @@ export async function getProjectName(projectId: string): Promise<string | null> 
 export async function getProjectWithRecords(projectId: string) {
   const accessibleCategoryIds = await getAccessibleCategoryIds();
   const project = await db.project.findUnique({
-    where: { id: projectId },
+    where: { id: projectId, archivedAt: null },
     include: {
       records: {
+        where: { archivedAt: null },
         orderBy: { createdAt: "desc" },
         select: {
           id: true,
@@ -102,9 +115,11 @@ export async function getInternalProjects() {
     where: { slug: "internal" },
     include: {
       projects: {
+        where: { archivedAt: null },
         orderBy: { name: "asc" },
         include: {
           records: {
+            where: { archivedAt: null },
             orderBy: { createdAt: "desc" },
             select: {
               id: true,
@@ -128,6 +143,40 @@ export async function getInternalProjects() {
   return internal?.projects ?? [];
 }
 
+/** Admin-only: returns all archived projects across all team categories. */
+export async function getArchivedProjects(): Promise<ArchivedProjectRow[]> {
+  const role = await getCurrentRole();
+  if (role !== "ADMIN") throw new Error("Unauthorized");
+
+  const rows = await db.project.findMany({
+    where: { archivedAt: { not: null } },
+    orderBy: { archivedAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      contact: true,
+      vertical: true,
+      status: true,
+      categoryId: true,
+      archivedAt: true,
+      category: { select: { name: true } },
+      _count: { select: { records: true } },
+    },
+  });
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    contact: r.contact,
+    vertical: r.vertical,
+    status: r.status as "ACTIVE" | "INACTIVE",
+    categoryId: r.categoryId,
+    categoryName: r.category?.name ?? null,
+    recordCount: r._count.records,
+    archivedAt: r.archivedAt!,
+  }));
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export type CreateProjectInput = {
@@ -140,9 +189,7 @@ export type CreateProjectInput = {
 export async function createProject(input: CreateProjectInput) {
   const accessibleCategoryIds = await getAccessibleCategoryIds();
   if (!input.categoryId) throw new Error("Category is required.");
-  if (!accessibleCategoryIds.includes(input.categoryId)) {
-    throw new Error("Unauthorized");
-  }
+  if (!accessibleCategoryIds.includes(input.categoryId)) throw new Error("Unauthorized");
 
   const project = await db.project.create({
     data: {
@@ -208,24 +255,89 @@ export async function updateProject(projectId: string, input: UpdateProjectInput
   return project;
 }
 
-export async function deleteProjects(projectIds: string[]) {
+/** Soft-delete: moves projects to the archive. Admin only. */
+export async function archiveProjects(projectIds: string[]) {
   const role = await getCurrentRole();
   const accessibleCategoryIds = await getAccessibleCategoryIds();
   if (role !== "ADMIN") throw new Error("Unauthorized");
 
   const ownedProjects = await db.project.findMany({
-    where: { id: { in: projectIds }, categoryId: { in: accessibleCategoryIds } },
-    select: { id: true },
+    where: { id: { in: projectIds }, categoryId: { in: accessibleCategoryIds }, archivedAt: null },
+    select: { id: true, name: true },
   });
   if (ownedProjects.length !== projectIds.length) throw new Error("Unauthorized");
 
+  await db.project.updateMany({
+    where: { id: { in: projectIds } },
+    data: { archivedAt: new Date() },
+  });
   await Promise.all(
-    projectIds.map((id) =>
-      writeAudit({ action: AuditAction.CLIENT_DELETED, resource: "project", resourceId: id }),
+    ownedProjects.map((p) =>
+      writeAudit({
+        action: AuditAction.CLIENT_ARCHIVED,
+        resource: "project",
+        resourceId: p.id,
+        projectId: p.id,
+        metadata: { name: p.name },
+      }),
+    ),
+  );
+  revalidatePath("/");
+}
+
+/** Restores archived projects back to active. Admin only. */
+export async function restoreProjects(projectIds: string[]) {
+  const role = await getCurrentRole();
+  if (role !== "ADMIN") throw new Error("Unauthorized");
+
+  const archivedProjects = await db.project.findMany({
+    where: { id: { in: projectIds }, archivedAt: { not: null } },
+    select: { id: true, name: true },
+  });
+  if (archivedProjects.length !== projectIds.length) throw new Error("Projects not found in archive");
+
+  await db.project.updateMany({
+    where: { id: { in: projectIds } },
+    data: { archivedAt: null },
+  });
+  await Promise.all(
+    archivedProjects.map((p) =>
+      writeAudit({
+        action: AuditAction.CLIENT_RESTORED,
+        resource: "project",
+        resourceId: p.id,
+        projectId: p.id,
+        metadata: { name: p.name },
+      }),
+    ),
+  );
+  revalidatePath("/");
+  revalidatePath("/settings");
+}
+
+/** Permanently deletes archived projects from the database. Admin only. */
+export async function permanentlyDeleteProjects(projectIds: string[]) {
+  const role = await getCurrentRole();
+  if (role !== "ADMIN") throw new Error("Unauthorized");
+
+  const archivedProjects = await db.project.findMany({
+    where: { id: { in: projectIds }, archivedAt: { not: null } },
+    select: { id: true, name: true },
+  });
+  if (archivedProjects.length !== projectIds.length) throw new Error("Projects not found in archive");
+
+  await Promise.all(
+    archivedProjects.map((p) =>
+      writeAudit({
+        action: AuditAction.CLIENT_DELETED,
+        resource: "project",
+        resourceId: p.id,
+        metadata: { name: p.name },
+      }),
     ),
   );
   await db.project.deleteMany({ where: { id: { in: projectIds } } });
-  revalidatePath("/");
+  revalidatePath("/settings");
 }
 
 export async function moveProjects(projectIds: string[], categoryId: string) {

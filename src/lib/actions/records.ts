@@ -24,6 +24,16 @@ export type RecordRow = {
   updatedAt: Date;
 };
 
+export type ArchivedRecordRow = {
+  id: string;
+  projectId: string;
+  title: string;
+  type: "CREDENTIAL" | "SECURE_NOTE";
+  serviceName: string | null;
+  username: string | null;
+  archivedAt: Date;
+};
+
 // ─── Shared auth helper ───────────────────────────────────────────────────────
 
 async function requireAccess() {
@@ -39,10 +49,10 @@ async function requireAccess() {
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-/** Returns record metadata — no secret. Used for the record listing. */
+/** Returns active (non-archived) record metadata. Used for the record listing. */
 export async function getRecords(projectId: string): Promise<RecordRow[]> {
   return db.record.findMany({
-    where: { projectId },
+    where: { projectId, archivedAt: null },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -211,13 +221,62 @@ export async function updateRecord(recordId: string, projectId: string, input: U
   return record;
 }
 
-export async function deleteRecord(recordId: string, projectId: string) {
+/** Soft-delete: moves a record to the archive. */
+export async function archiveRecord(recordId: string, projectId: string) {
   const { accessibleCategoryIds } = await requireAccess();
 
-  // Scope check — throws if record doesn't exist or is outside caller's categories
-  await db.record.findFirstOrThrow({
-    where: { id: recordId, project: { categoryId: { in: accessibleCategoryIds } } },
-    select: { id: true },
+  const record = await db.record.findFirstOrThrow({
+    where: { id: recordId, archivedAt: null, project: { categoryId: { in: accessibleCategoryIds } } },
+    select: { id: true, title: true },
+  });
+
+  await db.record.update({
+    where: { id: record.id },
+    data: { archivedAt: new Date() },
+  });
+  await writeAudit({
+    action: AuditAction.RECORD_ARCHIVED,
+    resource: "record",
+    resourceId: recordId,
+    projectId,
+    recordId,
+    metadata: { recordTitle: record.title },
+  });
+  revalidatePath(`/projects/${projectId}`);
+}
+
+/** Restores an archived record back to active. */
+export async function restoreRecord(recordId: string, projectId: string) {
+  const { accessibleCategoryIds } = await requireAccess();
+
+  const record = await db.record.findFirstOrThrow({
+    where: { id: recordId, archivedAt: { not: null }, project: { categoryId: { in: accessibleCategoryIds } } },
+    select: { id: true, title: true },
+  });
+
+  await db.record.update({
+    where: { id: record.id },
+    data: { archivedAt: null },
+  });
+  await writeAudit({
+    action: AuditAction.RECORD_RESTORED,
+    resource: "record",
+    resourceId: recordId,
+    projectId,
+    recordId,
+    metadata: { recordTitle: record.title },
+  });
+  revalidatePath(`/projects/${projectId}`);
+}
+
+/** Permanently deletes an archived record. Admin only. */
+export async function permanentlyDeleteRecord(recordId: string, projectId: string) {
+  const { role, accessibleCategoryIds } = await requireAccess();
+  if (role !== "ADMIN") throw new Error("Unauthorized");
+
+  const record = await db.record.findFirstOrThrow({
+    where: { id: recordId, archivedAt: { not: null }, project: { categoryId: { in: accessibleCategoryIds } } },
+    select: { id: true, title: true },
   });
 
   await writeAudit({
@@ -226,9 +285,35 @@ export async function deleteRecord(recordId: string, projectId: string) {
     resourceId: recordId,
     projectId,
     recordId,
+    metadata: { recordTitle: record.title },
   });
-  await db.record.delete({ where: { id: recordId } });
+  await db.record.delete({ where: { id: record.id } });
   revalidatePath(`/projects/${projectId}`);
+}
+
+/** Returns archived records for a project, scoped to caller's accessible categories. */
+export async function getArchivedRecords(projectId: string): Promise<ArchivedRecordRow[]> {
+  const { accessibleCategoryIds } = await requireAccess();
+
+  const rows = await db.record.findMany({
+    where: {
+      projectId,
+      archivedAt: { not: null },
+      project: { categoryId: { in: accessibleCategoryIds } },
+    },
+    orderBy: { archivedAt: "desc" },
+    select: {
+      id: true,
+      projectId: true,
+      title: true,
+      type: true,
+      serviceName: true,
+      username: true,
+      archivedAt: true,
+    },
+  });
+
+  return rows.map((r) => ({ ...r, archivedAt: r.archivedAt! }));
 }
 
 export type AuditPrevValues = {

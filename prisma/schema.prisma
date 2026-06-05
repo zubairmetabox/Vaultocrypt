@@ -44,6 +44,10 @@ enum AuditAction {
   SHARE_REVEALED
   SHARE_EXPIRED
   DATA_EXPORTED
+  CLIENT_ARCHIVED
+  CLIENT_RESTORED
+  RECORD_ARCHIVED
+  RECORD_RESTORED
 }
 
 model Category {
@@ -102,6 +106,7 @@ model Project {
   categoryId   String?
   category     Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   isRestricted Boolean        @default(false)
+  archivedAt   DateTime?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   records      Record[]
@@ -125,6 +130,7 @@ model Record {
   notes        String?
   sensitivity  RecordSensitivity @default(SENSITIVE)
   isRestricted Boolean           @default(false)
+  archivedAt   DateTime?
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
   createdById  String?
