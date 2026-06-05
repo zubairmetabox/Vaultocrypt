@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Clock, Eye, EyeOff, History, Loader2 } from "lucide-react";
+import { Eye, EyeOff, History, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   getRecordHistory,
@@ -82,116 +83,153 @@ export function RecordHistoryModal({ recordId, recordTitle, isAdmin, open, onOpe
     });
   }
 
+  const entryCount = history?.length ?? 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[80vh] max-w-lg flex-col">
-        <DialogHeader className="shrink-0">
-          <DialogTitle className="flex items-center gap-2">
-            <History className="size-4" />
-            {recordTitle}
-          </DialogTitle>
+      <DialogContent className="flex max-h-[82vh] max-w-md flex-col gap-0 p-0">
+        {/* Header */}
+        <DialogHeader className="shrink-0 border-b border-border/60 px-6 py-5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-8 items-center justify-center rounded-xl bg-muted">
+              <History className="size-4 text-muted-foreground" />
+            </div>
+            <div>
+              <DialogTitle className="text-base">{recordTitle}</DialogTitle>
+              <DialogDescription className="text-xs">
+                {loading ? "Loading…" : entryCount === 0 ? "No changes yet" : `${entryCount} change${entryCount === 1 ? "" : "s"}`}
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        {/* Body */}
+        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto">
           {loading && (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-16">
               <Loader2 className="size-5 animate-spin text-muted-foreground" />
             </div>
           )}
 
-          {!loading && history?.length === 0 && (
-            <p className="py-12 text-center text-sm text-muted-foreground">
-              No changes recorded yet.
-            </p>
+          {!loading && entryCount === 0 && (
+            <div className="flex flex-col items-center gap-2 py-16 text-center">
+              <History className="size-8 text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">No changes recorded yet.</p>
+              <p className="text-xs text-muted-foreground/60">Edit this record to start building history.</p>
+            </div>
           )}
 
-          {!loading && history && history.length > 0 && (
-            <div className="space-y-3 py-1">
-              {history.map((entry) => {
-                const revealedSecret = revealedSecrets.get(entry.id);
-                const isRevealingThis = revealingId === entry.id;
+          {!loading && history && entryCount > 0 && (
+            <div className="relative px-6 py-4">
+              {/* Timeline spine */}
+              <div className="absolute left-[2.35rem] top-6 bottom-6 w-px bg-border/50" />
 
-                // Collect rows to display — only fields with non-empty previous values
-                const rows: React.ReactNode[] = [];
+              <div className="space-y-6">
+                {history.map((entry, idx) => {
+                  const revealedSecret = revealedSecrets.get(entry.id);
+                  const isRevealingThis = revealingId === entry.id;
 
-                for (const field of entry.updatedFields) {
-                  if (field === "secretValue") {
-                    if (!entry.prev.hasPrevSecret) continue;
-                    rows.push(
-                      <div key="secretValue" className="flex items-center gap-3">
-                        <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground">
-                          {FIELD_LABELS.secretValue}
-                        </span>
-                        {revealedSecret !== undefined ? (
-                          <code className="flex-1 rounded-md bg-muted px-2 py-0.5 font-mono text-xs break-all">
-                            {revealedSecret || "—"}
-                          </code>
-                        ) : (
-                          <code className="flex-1 select-none text-xs tracking-[0.3em] text-muted-foreground">
-                            ●●●●●●●●●●
-                          </code>
-                        )}
-                        {isAdmin && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="size-6 shrink-0"
-                            disabled={isRevealingThis}
-                            onClick={() =>
-                              revealedSecret !== undefined
-                                ? handleHideSecret(entry.id)
-                                : handleRevealSecret(entry.id)
-                            }
-                          >
-                            {isRevealingThis ? (
-                              <Loader2 className="size-3 animate-spin" />
-                            ) : revealedSecret !== undefined ? (
-                              <EyeOff className="size-3" />
+                  // Build visible field rows
+                  const rows: { key: string; label: string; content: React.ReactNode }[] = [];
+
+                  for (const field of entry.updatedFields) {
+                    if (field === "secretValue") {
+                      if (!entry.prev.hasPrevSecret) continue;
+                      rows.push({
+                        key: "secretValue",
+                        label: FIELD_LABELS.secretValue,
+                        content: (
+                          <div className="flex items-center gap-2">
+                            {revealedSecret !== undefined ? (
+                              <code className="min-w-0 flex-1 break-all rounded-lg border border-border/50 bg-background px-2.5 py-1 font-mono text-xs text-foreground">
+                                {revealedSecret || "—"}
+                              </code>
                             ) : (
-                              <Eye className="size-3" />
+                              <code className="min-w-0 flex-1 select-none rounded-lg border border-border/50 bg-background px-2.5 py-1 text-xs tracking-[0.28em] text-muted-foreground">
+                                ●●●●●●●●●●●
+                              </code>
                             )}
-                          </Button>
-                        )}
-                      </div>,
-                    );
-                    continue;
+                            {isAdmin && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="size-7 shrink-0"
+                                disabled={isRevealingThis}
+                                onClick={() =>
+                                  revealedSecret !== undefined
+                                    ? handleHideSecret(entry.id)
+                                    : handleRevealSecret(entry.id)
+                                }
+                              >
+                                {isRevealingThis ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : revealedSecret !== undefined ? (
+                                  <EyeOff className="size-3.5" />
+                                ) : (
+                                  <Eye className="size-3.5" />
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        ),
+                      });
+                      continue;
+                    }
+
+                    const prevKey = field as keyof typeof entry.prev;
+                    const prevValue = entry.prev[prevKey];
+                    if (!prevValue || prevValue === true) continue;
+
+                    rows.push({
+                      key: field,
+                      label: FIELD_LABELS[field] ?? field,
+                      content: (
+                        <span className="min-w-0 flex-1 truncate text-sm text-foreground/90">
+                          {String(prevValue)}
+                        </span>
+                      ),
+                    });
                   }
 
-                  // Map updatedField key → prev object key
-                  const prevKey = field as keyof typeof entry.prev;
-                  const prevValue = entry.prev[prevKey];
-                  if (!prevValue || prevValue === true) continue;
+                  if (rows.length === 0) return null;
 
-                  rows.push(
-                    <div key={field} className="flex items-baseline gap-3">
-                      <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground">
-                        {FIELD_LABELS[field] ?? field}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-sm text-foreground/80">
-                        {String(prevValue)}
-                      </span>
-                    </div>,
-                  );
-                }
+                  return (
+                    <div key={entry.id} className="relative flex gap-4">
+                      {/* Timeline dot */}
+                      <div className="relative z-10 mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-border bg-background shadow-sm">
+                        <div className={`size-2 rounded-full ${idx === 0 ? "bg-primary" : "bg-muted-foreground/40"}`} />
+                      </div>
 
-                if (rows.length === 0) return null;
+                      {/* Entry card */}
+                      <div className="flex-1 overflow-hidden rounded-[1rem] border border-border/60 bg-card/80">
+                        {/* Entry header */}
+                        <div className="flex items-center justify-between gap-2 border-b border-border/40 px-3.5 py-2.5">
+                          <span className="text-xs font-medium text-foreground/80">
+                            {formatDate(entry.createdAt)}
+                          </span>
+                          {entry.actorName && (
+                            <span className="truncate text-xs text-muted-foreground">
+                              {entry.actorName}
+                            </span>
+                          )}
+                        </div>
 
-                return (
-                  <div key={entry.id} className="rounded-[1rem] border border-border/60 bg-muted/30 p-4">
-                    <div className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Clock className="size-3" />
-                      <span>{formatDate(entry.createdAt)}</span>
-                      {entry.actorName && (
-                        <>
-                          <span>·</span>
-                          <span>{entry.actorName}</span>
-                        </>
-                      )}
+                        {/* Field rows */}
+                        <div className="divide-y divide-border/40">
+                          {rows.map((row) => (
+                            <div key={row.key} className="flex items-center gap-3 px-3.5 py-2.5">
+                              <span className="w-18 shrink-0 text-xs font-medium text-muted-foreground">
+                                {row.label}
+                              </span>
+                              <div className="min-w-0 flex-1">{row.content}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-2">{rows}</div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

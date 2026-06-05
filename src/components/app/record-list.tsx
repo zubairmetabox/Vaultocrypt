@@ -578,9 +578,20 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                         </>
                       )}
 
-                      <p className="text-xs text-muted-foreground">
-                        {isOptimistic ? "Saving…" : `Updated ${formatDate(record.updatedAt)}`}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-muted-foreground">
+                          {isOptimistic ? "Saving…" : `Updated ${formatDate(record.updatedAt)}`}
+                        </p>
+                        {!isOptimistic && (
+                          <button
+                            onClick={() => setHistoryRecord({ id: record.id, title: record.title })}
+                            className="flex items-center gap-1 text-xs text-muted-foreground/50 transition-colors hover:text-muted-foreground"
+                          >
+                            <History className="size-3" />
+                            History
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
