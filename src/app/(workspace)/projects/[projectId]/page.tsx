@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { ProjectDetailsCard } from "@/components/app/project-details-card";
+import { ProjectHeaderWithAudit } from "@/components/app/project-header-with-audit";
 import { ProjectAuditTrail } from "@/components/app/project-audit-trail";
 import { RecordList } from "@/components/app/record-list";
 import { ArchivedRecordsSection } from "@/components/app/archived-records-section";
@@ -46,7 +46,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_400px]">
       <div className="space-y-6">
-        <ProjectDetailsCard
+        <ProjectHeaderWithAudit
           projectId={project.id}
           initialName={project.name}
           initialContact={project.contact ?? ""}
@@ -54,6 +54,11 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           initialStatus={project.status === "ACTIVE" ? "Active" : "Inactive"}
           currentCategoryId={project.categoryId}
           categories={categories}
+          initialEvents={project.auditEvents.map((event) => ({
+            ...event,
+            metadata: (event.metadata as Record<string, unknown> | null) ?? null,
+          }))}
+          role={role}
         />
         <RecordList projectId={project.id} initialRecords={records} categories={categories} />
         <ArchivedRecordsSection
@@ -63,7 +68,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         />
       </div>
 
-      <div className="self-start">
+      <div className="hidden xl:block self-start">
         <ProjectAuditTrail
           initialEvents={project.auditEvents.map((event) => ({
             ...event,

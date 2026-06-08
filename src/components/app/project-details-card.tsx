@@ -44,6 +44,7 @@ type ProjectDetailsCardProps = {
   initialStatus: ProjectStatus;
   currentCategoryId: string | null;
   categories: CategoryRow[];
+  mobileAuditButton?: React.ReactNode;
 };
 
 type ProjectDraft = {
@@ -75,6 +76,7 @@ export function ProjectDetailsCard({
   initialStatus,
   currentCategoryId,
   categories,
+  mobileAuditButton,
 }: ProjectDetailsCardProps) {
   const router = useRouter();
   const role = useRole();
@@ -197,6 +199,7 @@ export function ProjectDetailsCard({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {mobileAuditButton}
           <Badge variant={statusBadgeVariant(details.status)}>{details.status}</Badge>
 
           {/* ── Move category dialog (Admin only) ── */}
