@@ -197,4 +197,15 @@ model SharedBundle {
 model AppSettings {
   id               String  @id @default("singleton")
   sharingFromEmail String?
+  sharingFromName  String?
+}
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  source    String
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
 }

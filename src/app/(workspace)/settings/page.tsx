@@ -1,14 +1,15 @@
-import { Archive, LockKeyhole, Mail, SunMoon, Users } from "lucide-react";
+import { Archive, AlertTriangle, LockKeyhole, Mail, SunMoon, Users } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
 
 import { TeamSettings } from "@/components/app/team-settings";
 import { ThemeToggle } from "@/components/app/theme-toggle";
 import { ProjectArchive } from "@/components/app/project-archive";
 import { SharingSettings } from "@/components/app/sharing-settings";
+import { SystemLogs } from "@/components/app/system-logs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAdmins } from "@/lib/actions/users";
 import { getArchivedProjects } from "@/lib/actions/projects";
-import { getAppSettings } from "@/lib/actions/settings";
+import { getAppSettings, getSystemLogs } from "@/lib/actions/settings";
 import { getCurrentRole } from "@/lib/auth/get-role";
 import { prisma } from "@/lib/db";
 
@@ -34,16 +35,17 @@ export default async function SettingsPage() {
 
   const isAdmin = role === "ADMIN";
 
-  const [admins, archivedProjects, appSettings] = await Promise.all([
+  const [admins, archivedProjects, appSettings, systemLogs] = await Promise.all([
     isAdmin ? getAdmins(currentUserId) : Promise.resolve([]),
     isAdmin ? getArchivedProjects() : Promise.resolve([]),
     isAdmin ? getAppSettings() : Promise.resolve(null),
+    isAdmin ? getSystemLogs(100) : Promise.resolve([]),
   ]);
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
 
-      {/* ── Appearance — visible to all ───────────────────────────── */}
+      {/* Appearance — visible to all */}
       <Card className={`border-border/70 ${!isAdmin ? "lg:col-span-2" : ""}`}>
         <CardHeader>
           <div className="flex size-11 items-center justify-center rounded-[1.25rem] bg-muted">
@@ -59,7 +61,7 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* ── Admin-only cards ──────────────────────────────────────── */}
+      {/* Admin-only cards */}
       {isAdmin && (
         <Card className="border-border/70">
           <CardHeader>
@@ -100,7 +102,24 @@ export default async function SettingsPage() {
             <CardTitle className="mt-3">Sharing</CardTitle>
           </CardHeader>
           <CardContent>
-            <SharingSettings initialEmail={appSettings?.sharingFromEmail ?? null} />
+            <SharingSettings
+              initialEmail={appSettings?.sharingFromEmail ?? null}
+              initialName={appSettings?.sharingFromName ?? null}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin && (
+        <Card className="border-border/70 lg:col-span-2">
+          <CardHeader>
+            <div className="flex size-11 items-center justify-center rounded-[1.25rem] bg-muted">
+              <AlertTriangle className="size-4" />
+            </div>
+            <CardTitle className="mt-3">System Logs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SystemLogs initialLogs={systemLogs} />
           </CardContent>
         </Card>
       )}

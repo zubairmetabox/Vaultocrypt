@@ -166,6 +166,7 @@ export async function createSharedBundle(
     await sendShareNotification({
       to: bundle.clientEmail!, // always set for newly created bundles
       from: fromEmail,
+      fromName: settings.sharingFromName,
       shareUrl,
       projectName: project.name,
       recordTitles: records.map((r) => r.title),
@@ -233,6 +234,7 @@ export async function requestBundleOtp(bundleId: string): Promise<RequestOtpResu
     await sendOtpEmail({
       to: bundle.clientEmail,
       from: fromEmail,
+      fromName: settings.sharingFromName,
       otp,
       projectName: bundle.project.name,
     });
