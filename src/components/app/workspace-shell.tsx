@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { GripVertical, Menu, Search } from "lucide-react";
+import { GripVertical, Menu, Search, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import {
@@ -15,18 +15,11 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 
+import { BrandMark } from "@/components/app/brand-mark";
 import { CategoryActions } from "@/components/app/category-actions";
 import { HeaderAuth } from "@/components/app/header-auth";
 import { Sidebar } from "@/components/app/sidebar";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 
 import { moveProjects } from "@/lib/actions/projects";
 import { SearchProvider, useSearch } from "@/contexts/search";
@@ -68,9 +61,15 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
   const [isPending, startTransition] = useTransition();
   const [activeDrag, setActiveDrag] = useState<{ projectName: string } | null>(null);
   const [pendingCategoryIds, setPendingCategoryIds] = useState<string[]>([]);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { title: dynamicTitle } = useClientTitle();
 
-  // Clear pending loaders once the refreshed categories prop arrives (UI updated)
+  // Close mobile nav on navigation
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
+
+  // Clear pending loaders once the refreshed categories prop arrives
   useEffect(() => {
     setPendingCategoryIds([]);
   }, [categories]);
@@ -78,7 +77,6 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
   const { setQuery } = useSearch();
   const [searchValue, setSearchValue] = useState("");
 
-  // Clear search whenever the user navigates to a different page
   useEffect(() => {
     setSearchValue("");
     setQuery("");
@@ -115,13 +113,11 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
     });
   }
 
-  // All projects flattened — used for breadcrumb on /projects/[id]
   const allProjects = categories.flatMap((c) => c.projects);
 
   const activeProjectId = pathname.startsWith("/projects/") ? pathname.split("/")[2] : null;
   const activeProject = activeProjectId ? allProjects.find((p) => p.id === activeProjectId) : null;
 
-  // The category that owns the active project (drives the breadcrumb parent link)
   const activeProjectCategory = activeProject
     ? categories.find((c) => c.projects.some((p) => p.id === activeProject.id))
     : null;
@@ -148,11 +144,46 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
 
   return (
     <DndContext id="workspace-dnd" sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-    <div
-      className="h-screen overflow-hidden"
-      style={{ background: "var(--app-shell-bg)" }}
-    >
+    <div className="h-screen overflow-hidden" style={{ background: "var(--app-shell-bg)" }}>
+
+      {/* ── Mobile slide-out sidebar ─────────────────────────────────────── */}
+      {/* Backdrop */}
+      <div
+        className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
+          mobileNavOpen ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        onClick={() => setMobileNavOpen(false)}
+      />
+      {/* Drawer panel */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col overflow-hidden rounded-r-[2rem] border-r border-border/80 bg-background shadow-2xl transition-transform duration-300 ease-in-out lg:hidden ${
+          mobileNavOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between p-3 pb-0">
+          <span className="sr-only">Navigation</span>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="ml-auto"
+            onClick={() => setMobileNavOpen(false)}
+          >
+            <X className="size-4" />
+            <span className="sr-only">Close navigation</span>
+          </Button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3">
+          <Sidebar
+            pathname={pathname}
+            categories={categories}
+            pendingCategoryIds={isPending ? pendingCategoryIds : []}
+          />
+        </div>
+      </div>
+
+      {/* ── Main layout ──────────────────────────────────────────────────── */}
       <div className="mx-auto grid h-full max-w-[1820px] gap-4 p-3 sm:p-4 lg:grid-cols-[280px_1fr]">
+        {/* Desktop sidebar */}
         <div className="hidden h-full lg:block">
           <Sidebar pathname={pathname} categories={categories} pendingCategoryIds={isPending ? pendingCategoryIds : []} />
         </div>
@@ -160,27 +191,26 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
         <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2rem] border border-border/80 bg-background shadow-[0_30px_100px_-50px_rgba(15,23,42,0.45)]">
           <header className="sticky top-0 z-20 border-b border-border/70 bg-background px-4 py-4 sm:px-6">
             <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-3">
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="icon-sm" className="lg:hidden">
-                      <Menu className="size-4" />
-                      <span className="sr-only">Open navigation</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-xs" showCloseButton={false}>
-                    <DialogTitle className="sr-only">Navigation</DialogTitle>
-                    <DialogDescription className="sr-only">
-                      Workspace navigation
-                    </DialogDescription>
-                    <DialogBody className="p-3">
-                      <Sidebar pathname={pathname} categories={categories} pendingCategoryIds={isPending ? pendingCategoryIds : []} />
-                    </DialogBody>
-                  </DialogContent>
-                </Dialog>
 
-                <div className="hidden min-w-0 flex-1 items-center lg:flex">
-                  <div className="flex w-full max-w-xl items-center gap-2 rounded-[1.25rem] border border-border/70 bg-card/70 px-3 py-2 shadow-sm">
+              {/* Top bar */}
+              <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 lg:flex">
+                {/* Burger (mobile only) */}
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="lg:hidden"
+                  onClick={() => setMobileNavOpen(true)}
+                >
+                  <Menu className="size-4" />
+                  <span className="sr-only">Open navigation</span>
+                </Button>
+
+                {/* Center: logo on mobile, search on desktop */}
+                <div className="flex min-w-0 items-center justify-center lg:flex-1 lg:justify-start">
+                  <div className="lg:hidden">
+                    <BrandMark compact />
+                  </div>
+                  <div className="hidden w-full max-w-xl lg:flex items-center gap-2 rounded-[1.25rem] border border-border/70 bg-card/70 px-3 py-2 shadow-sm">
                     <Search className="size-4 text-muted-foreground" />
                     <input
                       value={searchValue}
@@ -191,11 +221,13 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
                   </div>
                 </div>
 
-                <div className="ml-auto flex items-center gap-2">
+                {/* Avatar (right) */}
+                <div className="flex items-center gap-2">
                   <HeaderAuth clerkEnabled={clerkEnabled} />
                 </div>
               </div>
 
+              {/* Breadcrumb / page title row */}
               <div className="flex items-center justify-between gap-4">
                 <div className="flex flex-col gap-1">
                   {showBreadcrumb ? (
