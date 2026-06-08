@@ -634,7 +634,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center">
                       {isNote && (
                         <Button
                           size="sm"
@@ -708,14 +708,15 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                       </Button>
 
                       <Button
-                        size="icon"
+                        size="sm"
                         variant="ghost"
-                        className={`size-8 ${!hasBeenEdited ? "cursor-default opacity-25" : ""}`}
+                        className={`sm:size-8 sm:p-0 ${!hasBeenEdited ? "cursor-default opacity-25" : ""}`}
                         title={hasBeenEdited ? "View change history" : "No history yet"}
                         onClick={() => hasBeenEdited && setHistoryRecord({ id: record.id, title: record.title })}
                         disabled={isOptimistic || !hasBeenEdited}
                       >
                         <History className="size-4" />
+                        <span className="sm:hidden">History</span>
                       </Button>
 
                       {isAdmin && categories && categories.length > 0 && (
@@ -739,6 +740,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                           disabled={isOptimistic}
                         >
                           <Trash2 className="size-4" />
+                          <span className="sm:hidden">Archive</span>
                         </Button>
                       )}
                     </div>
