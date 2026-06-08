@@ -32,11 +32,17 @@ const ACTION_META: Record<string, EventMeta> = {
 
 function AuditEvent({ event }: { event: BundleAuditEventRow }) {
   const [showInfo, setShowInfo] = useState(false);
-  const meta = ACTION_META[event.action] ?? {
-    label: event.action.replace(/_/g, " ").toLowerCase(),
-    icon: ShieldCheck,
-    tone: "outline" as const,
-  };
+
+  // SHARE_REVEALED with no recordTitle = client accessed the link (viewed the list)
+  // SHARE_REVEALED with recordTitle    = client revealed a specific secret
+  const isAccessEvent = event.action === "SHARE_REVEALED" && !event.recordTitle;
+  const meta: EventMeta = isAccessEvent
+    ? { label: "Link accessed", icon: ShieldCheck, tone: "outline" }
+    : ACTION_META[event.action] ?? {
+        label: event.action.replace(/_/g, " ").toLowerCase(),
+        icon: ShieldCheck,
+        tone: "outline" as const,
+      };
   const Icon = meta.icon;
   const hasAccessInfo = Boolean(event.ip);
   const parsed = event.userAgent ? parseUserAgent(event.userAgent) : null;

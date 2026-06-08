@@ -222,6 +222,7 @@ export async function verifySharePassword(bundleId: string, password: string): P
       expiresAt: true,
       expiredManually: true,
       recordIds: true,
+      projectId: true,
       project: { select: { name: true } },
     },
   });
@@ -250,6 +251,22 @@ export async function verifySharePassword(bundleId: string, password: string): P
   await db.sharedBundle.update({
     where: { id: bundleId },
     data: { failedAttempts: 0, lockedUntil: null },
+  });
+
+  // Log the access event with IP + UA so it appears in the audit trail
+  const h = await headers();
+  const rawIp = h.get("x-forwarded-for") ?? h.get("x-real-ip") ?? "unknown";
+  const ip = rawIp.split(",")[0].trim().slice(0, 45);
+  const userAgent = h.get("user-agent")?.slice(0, 512) ?? "unknown";
+
+  await db.auditEvent.create({
+    data: {
+      action: AuditAction.SHARE_REVEALED,
+      resource: "shared_bundle",
+      resourceId: bundleId,
+      projectId: bundle.projectId,
+      metadata: { event: "access", ip, userAgent },
+    },
   });
 
   const records = await db.record.findMany({
