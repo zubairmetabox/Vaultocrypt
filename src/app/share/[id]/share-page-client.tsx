@@ -93,6 +93,7 @@ export function SharePageClient({ bundleId }: SharePageClientProps) {
       if (!result.ok) {
         if (result.reason === "expired") setExpired(true);
         else if (result.reason === "locked") setOtpError("Too many attempts. Try again later.");
+        else if (result.reason === "no_email") setOtpError("This link is no longer valid. Please ask for a new one.");
         return;
       }
       setOtpSent(true);

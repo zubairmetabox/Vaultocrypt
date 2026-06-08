@@ -19,7 +19,7 @@ export type SharedBundleRow = {
   id: string;
   projectId: string;
   projectName: string;
-  clientEmail: string;
+  clientEmail: string | null;
   recordIds: string[];
   recordTitles: string[];
   expiresAt: Date | null;
@@ -164,7 +164,7 @@ export async function createSharedBundle(
     const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://vaultocrypt.vercel.app"}/share/${bundle.id}`;
 
     await sendShareNotification({
-      to: bundle.clientEmail,
+      to: bundle.clientEmail!, // always set for newly created bundles
       from: fromEmail,
       shareUrl,
       projectName: project.name,
@@ -185,7 +185,7 @@ const OTP_RESEND_COOLDOWN_MS = 60 * 1000; // 60 seconds
 
 export type RequestOtpResult =
   | { ok: true; cooldownUntil: Date }
-  | { ok: false; reason: "expired" | "locked" };
+  | { ok: false; reason: "expired" | "locked" | "no_email" };
 
 export async function requestBundleOtp(bundleId: string): Promise<RequestOtpResult> {
   const bundle = await db.sharedBundle.findUnique({
@@ -202,6 +202,7 @@ export async function requestBundleOtp(bundleId: string): Promise<RequestOtpResu
   });
 
   if (!bundle || !isBundleActive(bundle)) return { ok: false, reason: "expired" };
+  if (!bundle.clientEmail) return { ok: false, reason: "no_email" };
   if (bundle.otpLockedUntil && bundle.otpLockedUntil > new Date()) {
     return { ok: false, reason: "locked" };
   }
@@ -228,7 +229,7 @@ export async function requestBundleOtp(bundleId: string): Promise<RequestOtpResu
   // Send OTP email
   const settings = await getAppSettings();
   const fromEmail = settings.sharingFromEmail;
-  if (fromEmail) {
+  if (fromEmail && bundle.clientEmail) {
     await sendOtpEmail({
       to: bundle.clientEmail,
       from: fromEmail,

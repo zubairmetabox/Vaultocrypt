@@ -177,7 +177,7 @@ model SharedBundle {
   createdById     String
   projectId       String
   recordIds       String[]
-  clientEmail     String
+  clientEmail     String?
   otpHash         String?
   otpExpiresAt    DateTime?
   otpSentAt       DateTime?
