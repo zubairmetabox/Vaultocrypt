@@ -302,7 +302,7 @@ export async function verifyBundleOtp(bundleId: string, otp: string): Promise<Ve
       resource: "shared_bundle",
       resourceId: bundleId,
       projectId: bundle.projectId,
-      metadata: { event: "access", ip, userAgent },
+      metadata: { event: "access", ip, userAgent, clientEmail: bundle.clientEmail },
     },
   });
 
@@ -425,6 +425,8 @@ export type BundleDetail = SharedBundleRow & {
     id: string;
     action: string;
     createdAt: Date;
+    actorName: string | null;
+    clientEmail: string | null;
     recordTitle: string | null;
     ip: string | null;
     userAgent: string | null;
@@ -474,7 +476,10 @@ export async function getSharedBundleDetail(bundleId: string): Promise<BundleDet
   const auditEvents = await db.auditEvent.findMany({
     where: { resource: "shared_bundle", resourceId: bundleId },
     orderBy: { createdAt: "desc" },
-    select: { id: true, action: true, createdAt: true, metadata: true, recordId: true },
+    select: {
+      id: true, action: true, createdAt: true, metadata: true, recordId: true,
+      actor: { select: { firstName: true, lastName: true, email: true } },
+    },
   });
 
   return {
@@ -498,6 +503,10 @@ export async function getSharedBundleDetail(bundleId: string): Promise<BundleDet
         id: e.id,
         action: e.action,
         createdAt: e.createdAt,
+        actorName: e.actor
+          ? ([e.actor.firstName, e.actor.lastName].filter(Boolean).join(" ") || e.actor.email)
+          : null,
+        clientEmail: (meta.clientEmail as string | null) ?? null,
         recordTitle: (meta.recordTitle as string | null) ?? null,
         ip: (meta.ip as string | null) ?? null,
         userAgent: (meta.userAgent as string | null) ?? null,
@@ -527,7 +536,10 @@ export async function getBundleAuditEvents(bundleId: string): Promise<BundleAudi
   const events = await db.auditEvent.findMany({
     where: { resource: "shared_bundle", resourceId: bundleId },
     orderBy: { createdAt: "desc" },
-    select: { id: true, action: true, createdAt: true, metadata: true, recordId: true },
+    select: {
+      id: true, action: true, createdAt: true, metadata: true, recordId: true,
+      actor: { select: { firstName: true, lastName: true, email: true } },
+    },
   });
 
   return events.map((e) => {
@@ -536,6 +548,10 @@ export async function getBundleAuditEvents(bundleId: string): Promise<BundleAudi
       id: e.id,
       action: e.action,
       createdAt: e.createdAt,
+      actorName: e.actor
+        ? ([e.actor.firstName, e.actor.lastName].filter(Boolean).join(" ") || e.actor.email)
+        : null,
+      clientEmail: (meta.clientEmail as string | null) ?? null,
       recordTitle: (meta.recordTitle as string | null) ?? null,
       ip: (meta.ip as string | null) ?? null,
       userAgent: (meta.userAgent as string | null) ?? null,

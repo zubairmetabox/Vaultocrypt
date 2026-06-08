@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Eye, Info, Link2, Link2Off, ShieldCheck } from "lucide-react";
+import { Eye, Info, Link2, Link2Off, Mail, ShieldCheck, UserCheck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { getBundleAuditEvents, type BundleAuditEventRow, type BundleDetail } from "@/lib/actions/sharing";
@@ -21,36 +21,38 @@ function formatDate(date: Date): string {
   });
 }
 
-
 type EventMeta = { label: string; icon: React.ElementType; tone: "outline" | "secondary" | "destructive" };
 
-const ACTION_META: Record<string, EventMeta> = {
-  SHARE_CREATED:  { label: "Link created",     icon: Link2,     tone: "outline" },
-  SHARE_REVEALED: { label: "Secret revealed",  icon: Eye,       tone: "secondary" },
-  SHARE_EXPIRED:  { label: "Link expired",     icon: Link2Off,  tone: "destructive" },
-};
+function getEventMeta(event: BundleAuditEventRow): EventMeta {
+  if (event.action === "SHARE_REVEALED" && !event.recordTitle) {
+    return { label: "Link accessed", icon: UserCheck, tone: "outline" };
+  }
+  const map: Record<string, EventMeta> = {
+    SHARE_CREATED:  { label: "Link created",    icon: Link2,      tone: "outline" },
+    SHARE_REVEALED: { label: "Secret revealed",  icon: Eye,        tone: "secondary" },
+    SHARE_EXPIRED:  { label: "Link expired",     icon: Link2Off,   tone: "destructive" },
+  };
+  return map[event.action] ?? {
+    label: event.action.replace(/_/g, " ").toLowerCase(),
+    icon: ShieldCheck,
+    tone: "outline",
+  };
+}
 
 function AuditEvent({ event }: { event: BundleAuditEventRow }) {
   const [showInfo, setShowInfo] = useState(false);
-
-  // SHARE_REVEALED with no recordTitle = client accessed the link (viewed the list)
-  // SHARE_REVEALED with recordTitle    = client revealed a specific secret
-  const isAccessEvent = event.action === "SHARE_REVEALED" && !event.recordTitle;
-  const meta: EventMeta = isAccessEvent
-    ? { label: "Link accessed", icon: ShieldCheck, tone: "outline" }
-    : ACTION_META[event.action] ?? {
-        label: event.action.replace(/_/g, " ").toLowerCase(),
-        icon: ShieldCheck,
-        tone: "outline" as const,
-      };
+  const meta = getEventMeta(event);
   const Icon = meta.icon;
+  const isAccessEvent = event.action === "SHARE_REVEALED" && !event.recordTitle;
   const hasAccessInfo = Boolean(event.ip);
   const parsed = event.userAgent ? parseUserAgent(event.userAgent) : null;
 
   return (
     <div className="rounded-[1.4rem] border border-border/70 bg-card/70 p-4">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 space-y-1">
+        <div className="min-w-0 flex-1 space-y-1.5">
+
+          {/* Action label */}
           <div className="flex items-center gap-2">
             <Icon className="size-3.5 shrink-0 text-muted-foreground" />
             <p className="text-sm font-medium text-foreground">{meta.label}</p>
@@ -61,12 +63,25 @@ function AuditEvent({ event }: { event: BundleAuditEventRow }) {
             )}
           </div>
 
+          {/* Who: actor for workspace events, client email for access events */}
+          {isAccessEvent && event.clientEmail && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Mail className="size-3 shrink-0" />
+              <span>{event.clientEmail}</span>
+            </div>
+          )}
+          {!isAccessEvent && event.actorName && (
+            <p className="text-xs text-muted-foreground">
+              by <span className="font-medium text-foreground">{event.actorName}</span>
+            </p>
+          )}
+
+          {/* Access details toggle */}
           {hasAccessInfo && (
             <button
               type="button"
               onClick={() => setShowInfo((v) => !v)}
               className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-              aria-label="Toggle access details"
             >
               <Info className="size-3 shrink-0" />
               <span>{showInfo ? "Hide access details" : "Show access details"}</span>
@@ -74,7 +89,7 @@ function AuditEvent({ event }: { event: BundleAuditEventRow }) {
           )}
 
           {showInfo && hasAccessInfo && (
-            <div className="mt-2 rounded-[0.875rem] border border-border/50 bg-muted/40 px-3 py-2.5 space-y-1">
+            <div className="mt-1 rounded-[0.875rem] border border-border/50 bg-muted/40 px-3 py-2.5 space-y-1">
               <div className="flex items-baseline gap-2">
                 <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">IP</span>
                 <span className="font-mono text-xs text-foreground">{event.ip}</span>
@@ -114,16 +129,14 @@ export function BundleAuditTrail({ bundle }: Props) {
       try {
         const fresh = await getBundleAuditEvents(bundle.id);
         setEvents(fresh);
-      } catch {
-        // Polling failure — keep current events visible
-      }
+      } catch { /* keep current */ }
     }, 10_000);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [bundle.id]);
 
-  const revealCount = events.filter((e) => e.action === "SHARE_REVEALED").length;
+  const accessCount = events.filter(
+    (e) => e.action === "SHARE_REVEALED" && !e.recordTitle,
+  ).length;
 
   return (
     <aside className="rounded-[1.75rem] border border-border/70 bg-background/85 p-4 shadow-sm xl:sticky xl:top-6">
@@ -133,7 +146,7 @@ export function BundleAuditTrail({ bundle }: Props) {
             Audit Trail
           </h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Every access and reveal event for this share link.
+            Every access event for this share link.
           </p>
         </div>
         <div className="rounded-2xl border border-border/70 bg-card/80 p-2">
@@ -143,18 +156,21 @@ export function BundleAuditTrail({ bundle }: Props) {
 
       <div className="mt-4 rounded-[1.5rem] border border-border/70 bg-card/70 p-4">
         <div className="flex items-center gap-2 text-sm text-foreground">
-          <Eye className="size-4 text-primary" />
+          <UserCheck className="size-4 text-primary" />
           <span className="font-medium">
-            {revealCount} secret {revealCount === 1 ? "reveal" : "reveals"} recorded
+            {accessCount} {accessCount === 1 ? "access" : "accesses"} recorded
           </span>
         </div>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Each reveal is logged with IP address and browser info.
-        </p>
+        {bundle.clientEmail && (
+          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Mail className="size-3 shrink-0" />
+            <span>{bundle.clientEmail}</span>
+          </div>
+        )}
       </div>
 
       {events.length === 0 ? (
-        <p className="mt-4 text-sm text-muted-foreground">No audit events yet.</p>
+        <p className="mt-4 text-sm text-muted-foreground">No events yet.</p>
       ) : (
         <div className="mt-4 space-y-3">
           {events.map((event) => (
