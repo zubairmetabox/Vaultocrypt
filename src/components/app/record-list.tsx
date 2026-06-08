@@ -435,7 +435,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
   return (
     <>
       <Card className="border-border/70 bg-card/95">
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             {displayRecords.length > 0 && (
               <Checkbox
