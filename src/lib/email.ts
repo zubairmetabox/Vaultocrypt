@@ -1,6 +1,8 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
 // ─── Share notification ───────────────────────────────────────────────────────
 
@@ -25,7 +27,7 @@ export async function sendShareNotification({
     .map((t) => `<li style="margin:4px 0;color:#94a3b8;">${escapeHtml(t)}</li>`)
     .join("");
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from,
     to,
     subject: `${senderName} shared credentials from ${projectName}`,
@@ -97,7 +99,7 @@ export async function sendOtpEmail({
   otp: string;
   projectName: string;
 }) {
-  await resend.emails.send({
+  await getResend().emails.send({
     from,
     to,
     subject: `Your Vaultocrypt verification code`,
