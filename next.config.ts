@@ -18,12 +18,13 @@ const securityHeaders = [
     value: [
       "default-src 'self'",
       // Next.js hydration + Clerk SDK both require unsafe-inline/eval on scripts
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.com https://*.clerk.accounts.dev",
+      // challenges.cloudflare.com is required for Clerk's Turnstile CAPTCHA
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.com https://*.clerk.accounts.dev https://challenges.cloudflare.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://img.clerk.com",
       "font-src 'self'",
-      "connect-src 'self' https://*.clerk.com https://*.clerk.accounts.dev wss://*.clerk.com",
-      "frame-src 'self' https://*.clerk.com https://*.clerk.accounts.dev",
+      "connect-src 'self' https://*.clerk.com https://*.clerk.accounts.dev wss://*.clerk.com https://challenges.cloudflare.com",
+      "frame-src 'self' https://*.clerk.com https://*.clerk.accounts.dev https://challenges.cloudflare.com",
       "worker-src 'self' blob:",
     ].join("; "),
   },
