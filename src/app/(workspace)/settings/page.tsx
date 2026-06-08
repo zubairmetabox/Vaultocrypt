@@ -35,14 +35,16 @@ export default async function SettingsPage() {
   const isAdmin = role === "ADMIN";
 
   const [admins, archivedProjects, appSettings] = await Promise.all([
-    getAdmins(currentUserId),
+    isAdmin ? getAdmins(currentUserId) : Promise.resolve([]),
     isAdmin ? getArchivedProjects() : Promise.resolve([]),
     isAdmin ? getAppSettings() : Promise.resolve(null),
   ]);
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card className="border-border/70">
+
+      {/* ── Appearance — visible to all ───────────────────────────── */}
+      <Card className={`border-border/70 ${!isAdmin ? "lg:col-span-2" : ""}`}>
         <CardHeader>
           <div className="flex size-11 items-center justify-center rounded-[1.25rem] bg-muted">
             <SunMoon className="size-4" />
@@ -57,32 +59,37 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/70">
-        <CardHeader>
-          <div className="flex size-11 items-center justify-center rounded-[1.25rem] bg-muted">
-            <Users className="size-4" />
-          </div>
-          <CardTitle className="mt-3">Admins</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TeamSettings admins={admins} />
-        </CardContent>
-      </Card>
+      {/* ── Admin-only cards ──────────────────────────────────────── */}
+      {isAdmin && (
+        <Card className="border-border/70">
+          <CardHeader>
+            <div className="flex size-11 items-center justify-center rounded-[1.25rem] bg-muted">
+              <Users className="size-4" />
+            </div>
+            <CardTitle className="mt-3">Admins</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TeamSettings admins={admins} />
+          </CardContent>
+        </Card>
+      )}
 
-      <Card className="border-border/70 lg:col-span-2">
-        <CardHeader>
-          <div className="flex size-11 items-center justify-center rounded-[1.25rem] bg-muted">
-            <LockKeyhole className="size-4" />
-          </div>
-          <CardTitle className="mt-3">Restrictions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-            Sensitive clients and records can be flagged as exceptions without
-            changing the shared-first model.
-          </p>
-        </CardContent>
-      </Card>
+      {isAdmin && (
+        <Card className="border-border/70 lg:col-span-2">
+          <CardHeader>
+            <div className="flex size-11 items-center justify-center rounded-[1.25rem] bg-muted">
+              <LockKeyhole className="size-4" />
+            </div>
+            <CardTitle className="mt-3">Restrictions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+              Sensitive clients and records can be flagged as exceptions without
+              changing the shared-first model.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {isAdmin && (
         <Card className="border-border/70 lg:col-span-2">
