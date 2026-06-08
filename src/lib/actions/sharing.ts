@@ -161,7 +161,7 @@ export async function createSharedBundle(
   if (fromEmail) {
     const senderName =
       [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Your team";
-    const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://vaultocrypt.vercel.app"}/share/${bundle.id}`;
+    const shareUrl = `${(process.env.NEXT_PUBLIC_APP_URL ?? "https://vaultocrypt.vercel.app").trim()}/share/${bundle.id}`;
 
     await sendShareNotification({
       to: bundle.clientEmail!, // always set for newly created bundles
