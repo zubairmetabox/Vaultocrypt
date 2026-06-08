@@ -179,7 +179,7 @@ export function ProjectDetailsCard({
 
   return (
     <Card className="border-border/70 bg-card/95">
-      <CardHeader className="flex flex-row items-start justify-between gap-4">
+      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <CardTitle>{details.name}</CardTitle>
@@ -196,7 +196,7 @@ export function ProjectDetailsCard({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge variant={statusBadgeVariant(details.status)}>{details.status}</Badge>
 
           {/* ── Move category dialog (Admin only) ── */}
