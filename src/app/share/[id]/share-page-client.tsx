@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  AlertCircle,
   Clock,
   ClipboardCheck,
   Copy,
@@ -12,71 +11,120 @@ import {
   KeyRound,
   Link2Off,
   Loader2,
-  Lock,
+  Mail,
   ShieldCheck,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { verifySharePassword, revealSharedSecret, checkBundleStatus, type VerifyResult } from "@/lib/actions/sharing";
+import {
+  requestBundleOtp,
+  verifyBundleOtp,
+  checkBundleStatus,
+  type VerifyOtpResult,
+} from "@/lib/actions/sharing";
 import { safeUrl } from "@/lib/utils";
 
-type VerifiedRecord = Extract<VerifyResult, { ok: true }>["records"][number];
-
-type RevealState = "hidden" | "loading" | "revealed";
+type VerifiedRecord = Extract<VerifyOtpResult, { ok: true }>["records"][number];
 
 type SharePageClientProps = { bundleId: string };
 
 export function SharePageClient({ bundleId }: SharePageClientProps) {
-  const [password, setPassword] = useState("");
+  const [expired, setExpired] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
+
+  // Countdown until resend is allowed (seconds)
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [otp, setOtp] = useState("");
+  const otpInputRef = useRef<HTMLInputElement>(null);
 
   const [accessGranted, setAccessGranted] = useState(false);
-  const [expired, setExpired] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
   const [records, setRecords] = useState<VerifiedRecord[]>([]);
 
-  const [revealStates, setRevealStates] = useState<Map<string, RevealState>>(new Map());
-  const [revealedSecrets, setRevealedSecrets] = useState<Map<string, string>>(new Map());
+  const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Poll every 10 s once the user is past the password gate
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Expiry polling ────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!accessGranted) return;
     intervalRef.current = setInterval(async () => {
       try {
         const { active } = await checkBundleStatus(bundleId);
         if (!active) {
-          if (intervalRef.current) clearInterval(intervalRef.current);
+          clearInterval(intervalRef.current!);
           setExpired(true);
         }
-      } catch {
-        // Network blip — keep polling, don't evict
-      }
+      } catch { /* keep polling */ }
     }, 10_000);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [accessGranted, bundleId]);
 
-  async function handleVerify() {
-    if (!password.trim()) return;
-    setIsVerifying(true);
-    setVerifyError(null);
+  // ── Start cooldown timer ──────────────────────────────────────────────────
+
+  function startCooldown(until: Date) {
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    const tick = () => {
+      const secs = Math.max(0, Math.ceil((until.getTime() - Date.now()) / 1000));
+      setResendCooldown(secs);
+      if (secs === 0 && cooldownRef.current) clearInterval(cooldownRef.current);
+    };
+    tick();
+    cooldownRef.current = setInterval(tick, 500);
+  }
+
+  // ── Auto-send OTP on mount ────────────────────────────────────────────────
+
+  const sendOtp = useCallback(async () => {
+    setIsSending(true);
+    setOtpError(null);
     try {
-      const result = await verifySharePassword(bundleId, password.trim());
+      const result = await requestBundleOtp(bundleId);
       if (!result.ok) {
-        if (result.reason === "expired") {
-          setExpired(true);
-        } else if (result.reason === "locked") {
-          setVerifyError("Too many failed attempts. This link is locked for 15 minutes.");
-        } else {
-          setVerifyError("Incorrect password. Please check and try again.");
-        }
+        if (result.reason === "expired") setExpired(true);
+        else if (result.reason === "locked") setOtpError("Too many attempts. Try again later.");
+        return;
+      }
+      setOtpSent(true);
+      startCooldown(result.cooldownUntil);
+      setTimeout(() => otpInputRef.current?.focus(), 100);
+    } catch {
+      setOtpError("Failed to send code. Please try again.");
+    } finally {
+      setIsSending(false);
+    }
+  }, [bundleId]);
+
+  useEffect(() => {
+    sendOtp();
+    return () => { if (cooldownRef.current) clearInterval(cooldownRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Verify OTP ────────────────────────────────────────────────────────────
+
+  async function handleVerify() {
+    if (otp.trim().length !== 6) return;
+    setIsVerifying(true);
+    setOtpError(null);
+    try {
+      const result = await verifyBundleOtp(bundleId, otp.trim());
+      if (!result.ok) {
+        if (result.reason === "expired") setExpired(true);
+        else if (result.reason === "locked") setOtpError("Too many failed attempts. This link is locked for 15 minutes.");
+        else if (result.reason === "no_otp") setOtpError("Code expired — request a new one.");
+        else setOtpError("Incorrect code. Please check and try again.");
+        setOtp("");
         return;
       }
       setProjectName(result.projectName);
@@ -84,83 +132,52 @@ export function SharePageClient({ bundleId }: SharePageClientProps) {
       setRecords(result.records);
       setAccessGranted(true);
     } catch {
-      setVerifyError("Something went wrong. Please try again.");
+      setOtpError("Something went wrong. Please try again.");
     } finally {
       setIsVerifying(false);
     }
   }
 
-  async function handleReveal(record: VerifiedRecord) {
-    const current = revealStates.get(record.id);
-    if (current === "revealed") {
-      // Toggle hide
-      setRevealStates((prev) => {
-        const next = new Map(prev);
-        next.delete(record.id);
-        return next;
-      });
-      return;
-    }
+  // ── Reveal toggle ─────────────────────────────────────────────────────────
 
-    setRevealStates((prev) => new Map(prev).set(record.id, "loading"));
-    try {
-      const secret = await revealSharedSecret(bundleId, record.id, password);
-      setRevealedSecrets((prev) => new Map(prev).set(record.id, secret));
-      setRevealStates((prev) => new Map(prev).set(record.id, "revealed"));
-    } catch {
-      setRevealStates((prev) => {
-        const next = new Map(prev);
-        next.delete(record.id);
-        return next;
-      });
-    }
+  function toggleReveal(id: string) {
+    setRevealedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   }
 
   async function handleCopy(record: VerifiedRecord) {
-    let value = "";
-    const revealed = revealedSecrets.get(record.id);
-    if (revealed !== undefined) {
-      value = revealed;
-    } else {
-      try {
-        value = await revealSharedSecret(bundleId, record.id, password);
-        setRevealedSecrets((prev) => new Map(prev).set(record.id, value));
-        setRevealStates((prev) => new Map(prev).set(record.id, "revealed"));
-      } catch {
-        return;
-      }
-    }
+    const value = record.secret ?? "";
     if (!value) return;
     try {
       await navigator.clipboard.writeText(value);
     } catch {
       const el = document.createElement("textarea");
-      el.value = value;
-      el.style.cssText = "position:fixed;opacity:0";
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand("copy");
-      document.body.removeChild(el);
+      el.value = value; el.style.cssText = "position:fixed;opacity:0";
+      document.body.appendChild(el); el.select();
+      document.execCommand("copy"); document.body.removeChild(el);
     }
     setCopiedId(record.id);
-    setTimeout(() => setCopiedId((prev) => (prev === record.id ? null : prev)), 2000);
+    setTimeout(() => setCopiedId((p) => (p === record.id ? null : p)), 2000);
   }
 
-  // ── Expiry warning text ───────────────────────────────────────────────────
+  // ── Expiry warning ────────────────────────────────────────────────────────
 
   function expiryWarning(date: Date | null): string | null {
     if (!date) return null;
     const ms = date.getTime() - Date.now();
     if (ms <= 0) return null;
-    const minutes = Math.floor(ms / 60_000);
-    const hours = Math.floor(ms / 3_600_000);
     const days = Math.floor(ms / 86_400_000);
-    if (days >= 1) return `This link expires in ${days} day${days === 1 ? "" : "s"}.`;
-    if (hours >= 1) return `This link expires in ${hours} hour${hours === 1 ? "" : "s"}.`;
-    return `This link expires in ${minutes} minute${minutes === 1 ? "" : "s"}.`;
+    const hours = Math.floor(ms / 3_600_000);
+    const mins = Math.floor(ms / 60_000);
+    if (days >= 1) return `Link expires in ${days} day${days === 1 ? "" : "s"}.`;
+    if (hours >= 1) return `Link expires in ${hours} hour${hours === 1 ? "" : "s"}.`;
+    return `Link expires in ${mins} minute${mins === 1 ? "" : "s"}.`;
   }
 
-  // ── Expired screen ────────────────────────────────────────────────────────
+  // ── Screens ───────────────────────────────────────────────────────────────
 
   if (expired) {
     return (
@@ -180,55 +197,82 @@ export function SharePageClient({ bundleId }: SharePageClientProps) {
     );
   }
 
-  // ── Password gate ─────────────────────────────────────────────────────────
-
   if (!accessGranted) {
     return (
       <Shell>
         <div className="mx-auto max-w-sm space-y-6 pt-8">
           <div className="flex flex-col items-center gap-3 text-center">
             <div className="flex size-14 items-center justify-center rounded-[1.25rem] bg-muted">
-              <Lock className="size-6 text-muted-foreground" />
+              <Mail className="size-6 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-lg font-semibold text-foreground">Shared credentials</p>
+              <p className="text-lg font-semibold text-foreground">Check your email</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Enter the password you received to access these records.
+                {isSending
+                  ? "Sending verification code…"
+                  : otpSent
+                    ? "Enter the 6-digit code we sent you to access these credentials."
+                    : "Requesting verification code…"}
               </p>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <Input
-              type="password"
-              placeholder="Enter password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleVerify()}
-              disabled={isVerifying}
-              className="text-center font-mono tracking-widest"
-            />
-            {verifyError && (
-              <div className="flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                <AlertCircle className="size-4 shrink-0" />
-                {verifyError}
-              </div>
-            )}
-            <Button
-              className="w-full"
-              onClick={handleVerify}
-              disabled={!password.trim() || isVerifying}
-            >
-              {isVerifying ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Verifying…
-                </>
-              ) : (
-                "Access records"
+          {(otpSent || isSending) && (
+            <div className="space-y-3">
+              <Input
+                ref={otpInputRef}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                placeholder="000000"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                onKeyDown={(e) => e.key === "Enter" && handleVerify()}
+                disabled={isVerifying || isSending}
+                className="text-center font-mono text-2xl tracking-[0.5em]"
+              />
+
+              {otpError && (
+                <div className="flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  {otpError}
+                </div>
               )}
-            </Button>
-          </div>
+
+              <Button
+                className="w-full"
+                onClick={handleVerify}
+                disabled={otp.trim().length !== 6 || isVerifying || isSending}
+              >
+                {isVerifying ? (
+                  <><Loader2 className="size-4 animate-spin" />Verifying…</>
+                ) : (
+                  "Verify code"
+                )}
+              </Button>
+
+              <Button
+                variant="ghost"
+                className="w-full text-sm text-muted-foreground"
+                onClick={sendOtp}
+                disabled={resendCooldown > 0 || isSending}
+              >
+                {isSending ? (
+                  <><Loader2 className="size-4 animate-spin" />Sending…</>
+                ) : resendCooldown > 0 ? (
+                  `Resend code in ${resendCooldown}s`
+                ) : (
+                  "Resend code"
+                )}
+              </Button>
+            </div>
+          )}
+
+          {!otpSent && !isSending && otpError && (
+            <div className="flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              {otpError}
+            </div>
+          )}
         </div>
       </Shell>
     );
@@ -241,9 +285,7 @@ export function SharePageClient({ bundleId }: SharePageClientProps) {
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Shared from
-            </p>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Shared from</p>
             <p className="text-lg font-semibold text-foreground">{projectName}</p>
           </div>
           <Badge variant="outline" className="gap-1.5 text-xs">
@@ -261,12 +303,10 @@ export function SharePageClient({ bundleId }: SharePageClientProps) {
 
         <div className="space-y-3">
           {records.map((record) => {
-            const revealState = revealStates.get(record.id) ?? "hidden";
-            const isRevealed = revealState === "revealed";
-            const isLoading = revealState === "loading";
             const isNote = record.type === "SECURE_NOTE";
-            const secret = revealedSecrets.get(record.id);
+            const isRevealed = revealedIds.has(record.id);
             const isCopied = copiedId === record.id;
+            const hasSecret = record.secret !== null;
 
             return (
               <div
@@ -280,35 +320,22 @@ export function SharePageClient({ bundleId }: SharePageClientProps) {
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <div
-                        className={
-                          isNote
-                            ? "flex size-8 shrink-0 items-center justify-center rounded-xl bg-amber-300/10 text-amber-100"
-                            : "flex size-6 shrink-0 items-center justify-center rounded-lg bg-muted"
-                        }
-                      >
-                        {isNote ? (
-                          <FileText className="size-4" />
-                        ) : (
-                          <KeyRound className="size-3.5 text-muted-foreground" />
-                        )}
+                      <div className={isNote
+                        ? "flex size-8 shrink-0 items-center justify-center rounded-xl bg-amber-300/10 text-amber-100"
+                        : "flex size-6 shrink-0 items-center justify-center rounded-lg bg-muted"
+                      }>
+                        {isNote ? <FileText className="size-4" /> : <KeyRound className="size-3.5 text-muted-foreground" />}
                       </div>
                       <p className="font-medium text-foreground">{record.title}</p>
-                      <Badge variant="outline" className="text-xs">
-                        {isNote ? "note" : "credential"}
-                      </Badge>
+                      <Badge variant="outline" className="text-xs">{isNote ? "note" : "credential"}</Badge>
                     </div>
 
                     <div className="space-y-0.5">
                       {record.url && (
                         <div className="flex items-baseline gap-2">
                           <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">URL</span>
-                          <a
-                            href={safeUrl(record.url)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="min-w-0 truncate text-sm text-foreground hover:underline"
-                          >
+                          <a href={safeUrl(record.url)} target="_blank" rel="noopener noreferrer"
+                            className="min-w-0 truncate text-sm text-foreground hover:underline">
                             {record.serviceName || record.url}
                           </a>
                         </div>
@@ -331,64 +358,30 @@ export function SharePageClient({ bundleId }: SharePageClientProps) {
                       <div className="rounded-[1.2rem] border border-amber-200/10 bg-slate-950/18 px-4 py-3">
                         <p className="whitespace-pre-wrap text-sm leading-6 text-foreground/92">
                           {isRevealed
-                            ? (secret || "Empty note")
+                            ? (record.secret || record.notes || "Empty note")
                             : record.notes
                               ? record.notes.slice(0, 120) + (record.notes.length > 120 ? "…" : "")
                               : "Hidden note content"}
                         </p>
                       </div>
-                    ) : record.hasSecret ? (
-                      <code
-                        className={`inline-block rounded-lg border border-border/50 bg-muted/60 px-2.5 py-1 text-xs ${
-                          isRevealed ? "font-mono text-foreground" : "select-none tracking-[0.3em] text-muted-foreground"
-                        }`}
-                      >
-                        {isRevealed ? (secret || "—") : "•".repeat(18)}
+                    ) : hasSecret ? (
+                      <code className={`inline-block rounded-lg border border-border/50 bg-muted/60 px-2.5 py-1 text-xs ${
+                        isRevealed ? "font-mono text-foreground" : "select-none tracking-[0.3em] text-muted-foreground"
+                      }`}>
+                        {isRevealed ? (record.secret || "—") : "•".repeat(18)}
                       </code>
                     ) : null}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    {record.hasSecret && (
-                      <Button
-                        size="sm"
-                        variant={isRevealed ? "default" : "outline"}
-                        onClick={() => handleReveal(record)}
-                        disabled={isLoading}
-                      >
-                        {isLoading ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : isRevealed ? (
-                          <>
-                            <EyeOff className="size-4" />
-                            Hide
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="size-4" />
-                            Reveal
-                          </>
-                        )}
+                    {hasSecret && (
+                      <Button size="sm" variant={isRevealed ? "default" : "outline"} onClick={() => toggleReveal(record.id)}>
+                        {isRevealed ? <><EyeOff className="size-4" />Hide</> : <><Eye className="size-4" />Reveal</>}
                       </Button>
                     )}
-
-                    {record.hasSecret && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleCopy(record)}
-                      >
-                        {isCopied ? (
-                          <>
-                            <ClipboardCheck className="size-4 text-primary" />
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="size-4" />
-                            Copy
-                          </>
-                        )}
+                    {hasSecret && (
+                      <Button size="sm" variant="outline" onClick={() => handleCopy(record)}>
+                        {isCopied ? <><ClipboardCheck className="size-4 text-primary" />Copied</> : <><Copy className="size-4" />Copy</>}
                       </Button>
                     )}
                   </div>
@@ -401,8 +394,6 @@ export function SharePageClient({ bundleId }: SharePageClientProps) {
     </Shell>
   );
 }
-
-// ── Minimal branded shell for the public page ──────────────────────────────
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (

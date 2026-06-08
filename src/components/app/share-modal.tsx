@@ -1,16 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useTransition, useState } from "react";
 import {
   AlertCircle,
   Check,
-  ClipboardCheck,
-  Copy,
-  Eye,
-  EyeOff,
   FileText,
   KeyRound,
   Loader2,
+  Mail,
+  Send,
   Share2,
 } from "lucide-react";
 
@@ -23,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -41,7 +40,7 @@ type ShareModalProps = {
   selectedRecords: SelectedRecord[];
 };
 
-type Phase = "config" | "loading" | "success";
+type Phase = "config" | "success";
 
 const EXPIRY_LABELS: Record<ExpiryOption, string> = {
   "1h": "1 hour",
@@ -51,65 +50,39 @@ const EXPIRY_LABELS: Record<ExpiryOption, string> = {
   never: "Never",
 };
 
-function useClipboard(timeoutMs = 2000) {
-  const [copied, setCopied] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  async function copy(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      const el = document.createElement("textarea");
-      el.value = text;
-      el.style.cssText = "position:fixed;opacity:0";
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand("copy");
-      document.body.removeChild(el);
-    }
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setCopied(true);
-    timerRef.current = setTimeout(() => setCopied(false), timeoutMs);
-  }
-
-  return { copied, copy };
-}
-
 export function ShareModal({ open, onOpenChange, projectId, selectedRecords }: ShareModalProps) {
   const [phase, setPhase] = useState<Phase>("config");
   const [expiry, setExpiry] = useState<ExpiryOption>("7d");
+  const [clientEmail, setClientEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-
-  const [shareId, setShareId] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [showPassword, setShowPassword] = useState(false);
-
-  const urlClip = useClipboard();
-  const pwClip = useClipboard();
+  const [sentToEmail, setSentToEmail] = useState("");
 
   useEffect(() => {
     if (open) {
       setPhase("config");
       setExpiry("7d");
+      setClientEmail("");
       setError(null);
-      setShareId("");
-      setPassword("");
-      setShowPassword(false);
+      setSentToEmail("");
     }
   }, [open]);
 
   function handleShare() {
+    if (!clientEmail.trim()) {
+      setError("Please enter the client's email address.");
+      return;
+    }
     setError(null);
     startTransition(async () => {
       try {
-        const { id, password: pw } = await createSharedBundle(
+        await createSharedBundle(
           projectId,
           selectedRecords.map((r) => r.id),
           expiry,
+          clientEmail.trim(),
         );
-        setShareId(id);
-        setPassword(pw);
+        setSentToEmail(clientEmail.trim());
         setPhase("success");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to create share link.");
@@ -117,18 +90,12 @@ export function ShareModal({ open, onOpenChange, projectId, selectedRecords }: S
     });
   }
 
-  const shareUrl = shareId ? `${window.location.origin}/share/${shareId}` : "";
-
-  const canClose = phase !== "loading" && !isPending;
+  const canClose = !isPending;
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (canClose) onOpenChange(o);
-      }}
-    >
+    <Dialog open={open} onOpenChange={(o) => { if (canClose) onOpenChange(o); }}>
       <DialogContent className="sm:max-w-md">
+
         {phase === "config" && (
           <>
             <DialogHeader>
@@ -137,13 +104,13 @@ export function ShareModal({ open, onOpenChange, projectId, selectedRecords }: S
                 Share records
               </DialogTitle>
               <DialogDescription>
-                Generate a secure link and password. Recipients can view the selected records
-                without a Vaultocrypt account.
+                Enter the client's email — they'll receive a link and use a one-time code to access
+                the selected records.
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 px-6 py-2">
-              {/* Selected records list */}
+              {/* Selected records */}
               <div className="rounded-[1.25rem] border border-border/70 bg-muted/30 p-3">
                 <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   {selectedRecords.length} {selectedRecords.length === 1 ? "record" : "records"} included
@@ -162,6 +129,23 @@ export function ShareModal({ open, onOpenChange, projectId, selectedRecords }: S
                 </ul>
               </div>
 
+              {/* Client email */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Client email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="email"
+                    placeholder="client@example.com"
+                    value={clientEmail}
+                    onChange={(e) => setClientEmail(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleShare()}
+                    disabled={isPending}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
               {/* Expiry */}
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-foreground">Link expires in</label>
@@ -171,9 +155,7 @@ export function ShareModal({ open, onOpenChange, projectId, selectedRecords }: S
                   </SelectTrigger>
                   <SelectContent>
                     {(Object.entries(EXPIRY_LABELS) as [ExpiryOption, string][]).map(([val, label]) => (
-                      <SelectItem key={val} value={val}>
-                        {label}
-                      </SelectItem>
+                      <SelectItem key={val} value={val}>{label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -195,12 +177,12 @@ export function ShareModal({ open, onOpenChange, projectId, selectedRecords }: S
                 {isPending ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />
-                    Creating…
+                    Sending…
                   </>
                 ) : (
                   <>
-                    <Share2 className="size-4" />
-                    Share
+                    <Send className="size-4" />
+                    Send
                   </>
                 )}
               </Button>
@@ -213,76 +195,25 @@ export function ShareModal({ open, onOpenChange, projectId, selectedRecords }: S
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Check className="size-4 text-emerald-500" />
-                Share link created
+                Invitation sent
               </DialogTitle>
               <DialogDescription>
-                Send both the link and the password to the recipient — they need both to access the
-                records.
+                An email with the access link has been sent to the client.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 px-6 py-2">
-              {/* URL row */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Share URL
-                </label>
-                <div className="flex items-center gap-2">
-                  <code className="min-w-0 flex-1 truncate rounded-[0.875rem] border border-border/70 bg-muted/50 px-3 py-2 text-xs text-foreground">
-                    {shareUrl}
-                  </code>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    onClick={() => urlClip.copy(shareUrl)}
-                  >
-                    {urlClip.copied ? (
-                      <ClipboardCheck className="size-4 text-primary" />
-                    ) : (
-                      <Copy className="size-4" />
-                    )}
-                  </Button>
+            <div className="px-6 py-2">
+              <div className="flex items-center gap-3 rounded-[1.25rem] border border-border/70 bg-muted/30 px-4 py-3">
+                <Mail className="size-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Sent to</p>
+                  <p className="truncate text-sm font-medium text-foreground">{sentToEmail}</p>
                 </div>
               </div>
-
-              {/* Password row */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Password
-                </label>
-                <div className="flex items-center gap-2">
-                  <code className="min-w-0 flex-1 truncate rounded-[0.875rem] border border-border/70 bg-muted/50 px-3 py-2 font-mono text-xs text-foreground">
-                    {showPassword ? password : "•".repeat(password.length)}
-                  </code>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-8 shrink-0"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? "Hide password" : "Reveal password"}
-                  >
-                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    onClick={() => pwClip.copy(password)}
-                  >
-                    {pwClip.copied ? (
-                      <ClipboardCheck className="size-4 text-primary" />
-                    ) : (
-                      <Copy className="size-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                Expiry: <span className="font-medium text-foreground">{EXPIRY_LABELS[expiry]}</span>
-                {" · "}
-                The password is stored and can be retrieved from the Sharing page.
+              <p className="mt-3 text-xs text-muted-foreground">
+                The client will receive a one-time code by email when they open the link.
+                Link expires in{" "}
+                <span className="font-medium text-foreground">{EXPIRY_LABELS[expiry]}</span>.
               </p>
             </div>
 
@@ -291,6 +222,7 @@ export function ShareModal({ open, onOpenChange, projectId, selectedRecords }: S
             </DialogFooter>
           </>
         )}
+
       </DialogContent>
     </Dialog>
   );

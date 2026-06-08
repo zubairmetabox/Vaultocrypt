@@ -1,12 +1,14 @@
-import { Archive, LockKeyhole, SunMoon, Users } from "lucide-react";
+import { Archive, LockKeyhole, Mail, SunMoon, Users } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
 
 import { TeamSettings } from "@/components/app/team-settings";
 import { ThemeToggle } from "@/components/app/theme-toggle";
 import { ProjectArchive } from "@/components/app/project-archive";
+import { SharingSettings } from "@/components/app/sharing-settings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAdmins } from "@/lib/actions/users";
 import { getArchivedProjects } from "@/lib/actions/projects";
+import { getAppSettings } from "@/lib/actions/settings";
 import { getCurrentRole } from "@/lib/auth/get-role";
 import { prisma } from "@/lib/db";
 
@@ -32,9 +34,10 @@ export default async function SettingsPage() {
 
   const isAdmin = role === "ADMIN";
 
-  const [admins, archivedProjects] = await Promise.all([
+  const [admins, archivedProjects, appSettings] = await Promise.all([
     getAdmins(currentUserId),
     isAdmin ? getArchivedProjects() : Promise.resolve([]),
+    isAdmin ? getAppSettings() : Promise.resolve(null),
   ]);
 
   return (
@@ -80,6 +83,20 @@ export default async function SettingsPage() {
           </p>
         </CardContent>
       </Card>
+
+      {isAdmin && (
+        <Card className="border-border/70 lg:col-span-2">
+          <CardHeader>
+            <div className="flex size-11 items-center justify-center rounded-[1.25rem] bg-muted">
+              <Mail className="size-4" />
+            </div>
+            <CardTitle className="mt-3">Sharing</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SharingSettings initialEmail={appSettings?.sharingFromEmail ?? null} />
+          </CardContent>
+        </Card>
+      )}
 
       {isAdmin && (
         <Card className="border-border/70 lg:col-span-2">
