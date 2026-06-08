@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import NextTopLoader from "nextjs-toploader";
 import { AuthProvider } from "@/components/auth-provider";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { PwaRegister } from "@/components/app/pwa-register";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -20,6 +21,20 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Vaultocrypt",
   description: "Internal client credential workspace for MetaBox Technology.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Vaultocrypt",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#08111f",
+  width: "device-width",
+  initialScale: 1,
+  minimumScale: 1,
+  viewportFit: "cover",
 };
 
 const themeInitScript = `
@@ -63,6 +78,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full font-sans text-foreground">
         <NextTopLoader color="#9edcff" height={2} showSpinner={false} shadow={false} />
+        <PwaRegister />
         <AuthProvider>
           <ThemeProvider>
             <TooltipProvider>
