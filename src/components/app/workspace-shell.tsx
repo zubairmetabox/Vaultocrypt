@@ -151,7 +151,7 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
   const showBreadcrumb = Boolean(activeProject) || isBundleDetailPage;
 
   return (
-    <DndContext id="workspace-dnd" sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext id="workspace-dnd" sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActiveDrag(null)}>
     <div className="h-screen overflow-hidden" style={{ background: "var(--app-shell-bg)" }}>
 
       {/* ── Mobile slide-out sidebar ─────────────────────────────────────── */}
