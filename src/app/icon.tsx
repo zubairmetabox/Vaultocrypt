@@ -7,15 +7,10 @@ export function generateImageMetadata() {
   ];
 }
 
-export default function Icon({
-  id,
-  size,
-}: {
-  id: string;
-  size: { width: number; height: number };
-}) {
-  const { width, height } = size;
-  const s = width; // square
+const SIZES: Record<string, number> = { "192": 192, "512": 512 };
+
+export default function Icon({ id }: { id: string }) {
+  const s = SIZES[id] ?? 512;
 
   // Scale relative to 512 canvas
   const scale = s / 512;
@@ -23,13 +18,7 @@ export default function Icon({
   const inner = s - pad * 2;
   const radius = Math.round(120 * scale);
 
-  // Shield path scaled to `inner` box, centred at (pad, pad)
-  // Lucide ShieldCheck viewBox 0 0 24 24, scaled to inner×inner
-  const unit = inner / 24;
-  const tx = pad;
-  const ty = pad;
-
-  // Stroke width
+  // Stroke width scaled with canvas size
   const sw = Math.max(1, Math.round(2 * scale));
 
   return new ImageResponse(
