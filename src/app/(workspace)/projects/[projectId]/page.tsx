@@ -1,9 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { ProjectHeaderWithAudit } from "@/components/app/project-header-with-audit";
-import { ProjectAuditTrail } from "@/components/app/project-audit-trail";
-import { RecordList } from "@/components/app/record-list";
-import { ArchivedRecordsSection } from "@/components/app/archived-records-section";
+import { ProjectPageShell } from "@/components/app/project-page-shell";
 import { getCategories } from "@/lib/actions/categories";
 import { getProjectWithRecords } from "@/lib/actions/projects";
 import { getArchivedRecords } from "@/lib/actions/records";
@@ -44,40 +41,21 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   }));
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_400px]">
-      <div className="space-y-6">
-        <ProjectHeaderWithAudit
-          projectId={project.id}
-          initialName={project.name}
-          initialContact={project.contact ?? ""}
-          initialVertical={project.vertical ?? ""}
-          initialStatus={project.status === "ACTIVE" ? "Active" : "Inactive"}
-          currentCategoryId={project.categoryId}
-          categories={categories}
-          initialEvents={project.auditEvents.map((event) => ({
-            ...event,
-            metadata: (event.metadata as Record<string, unknown> | null) ?? null,
-          }))}
-          role={role}
-        />
-        <RecordList projectId={project.id} initialRecords={records} categories={categories} />
-        <ArchivedRecordsSection
-          projectId={project.id}
-          initialRecords={archivedRecords}
-          isAdmin={role === "ADMIN"}
-        />
-      </div>
-
-      <div className="hidden xl:block self-start">
-        <ProjectAuditTrail
-          initialEvents={project.auditEvents.map((event) => ({
-            ...event,
-            metadata: (event.metadata as Record<string, unknown> | null) ?? null,
-          }))}
-          projectId={project.id}
-          role={role}
-        />
-      </div>
-    </div>
+    <ProjectPageShell
+      projectId={project.id}
+      initialName={project.name}
+      initialContact={project.contact ?? ""}
+      initialVertical={project.vertical ?? ""}
+      initialStatus={project.status === "ACTIVE" ? "Active" : "Inactive"}
+      currentCategoryId={project.categoryId}
+      categories={categories}
+      initialEvents={project.auditEvents.map((event) => ({
+        ...event,
+        metadata: (event.metadata as Record<string, unknown> | null) ?? null,
+      }))}
+      role={role}
+      records={records}
+      archivedRecords={archivedRecords}
+    />
   );
 }

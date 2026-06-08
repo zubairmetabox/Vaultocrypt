@@ -181,25 +181,27 @@ export function ProjectDetailsCard({
 
   return (
     <Card className="border-border/70 bg-card/95">
-      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
+      <CardHeader className="space-y-3">
+        {/* Top row: title + audit trail button (mobile) */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-2">
             <CardTitle>{details.name}</CardTitle>
+            <div className="space-y-1 text-sm text-muted-foreground">
+              {details.contact && <p>{details.contact}</p>}
+              {details.vertical && <p>{details.vertical}</p>}
+            </div>
+            {activeCategory && (
+              <p className="text-xs text-muted-foreground">
+                Category:{" "}
+                <span className="font-medium text-foreground">{activeCategory.name}</span>
+              </p>
+            )}
           </div>
-          <div className="space-y-1 text-sm text-muted-foreground">
-            {details.contact && <p>{details.contact}</p>}
-            {details.vertical && <p>{details.vertical}</p>}
-          </div>
-          {activeCategory && (
-            <p className="text-xs text-muted-foreground">
-              Category:{" "}
-              <span className="font-medium text-foreground">{activeCategory.name}</span>
-            </p>
-          )}
+          {mobileAuditButton && <div className="shrink-0">{mobileAuditButton}</div>}
         </div>
 
+        {/* Actions row: status badge + move + edit */}
         <div className="flex flex-wrap items-center gap-2">
-          {mobileAuditButton}
           <Badge variant={statusBadgeVariant(details.status)}>{details.status}</Badge>
 
           {/* ── Move category dialog (Admin only) ── */}

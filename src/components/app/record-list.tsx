@@ -126,7 +126,13 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
   const [openNote, setOpenNote] = useState<OpenNoteState>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [shareOpen, setShareOpen] = useState(false);
-  const [historyRecord, setHistoryRecord] = useState<{ id: string; title: string } | null>(null);
+  const [historyRecord, setHistoryRecord] = useState<{
+    id: string;
+    title: string;
+    serviceName: string | null;
+    url: string | null;
+    username: string | null;
+  } | null>(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function handleReveal(record: RecordItem) {
@@ -617,13 +623,13 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                         </>
                       )}
 
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="whitespace-nowrap text-xs text-muted-foreground">
                           {isOptimistic ? "Saving…" : `Updated ${formatDate(record.updatedAt)}`}
                         </p>
                         {!isOptimistic && (
                           <button
-                            onClick={() => hasBeenEdited && setHistoryRecord({ id: record.id, title: record.title })}
+                            onClick={() => hasBeenEdited && setHistoryRecord({ id: record.id, title: record.title, serviceName: record.serviceName, url: record.url, username: record.username })}
                             disabled={!hasBeenEdited}
                             className={`flex items-center gap-1 text-xs transition-colors ${hasBeenEdited ? "text-muted-foreground/50 hover:text-muted-foreground" : "cursor-default text-muted-foreground/20"}`}
                           >
@@ -712,7 +718,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                         variant="ghost"
                         className={`sm:size-8 sm:p-0 ${!hasBeenEdited ? "cursor-default opacity-25" : ""}`}
                         title={hasBeenEdited ? "View change history" : "No history yet"}
-                        onClick={() => hasBeenEdited && setHistoryRecord({ id: record.id, title: record.title })}
+                        onClick={() => hasBeenEdited && setHistoryRecord({ id: record.id, title: record.title, serviceName: record.serviceName, url: record.url, username: record.username })}
                         disabled={isOptimistic || !hasBeenEdited}
                       >
                         <History className="size-4" />
@@ -859,6 +865,12 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
         recordId={historyRecord?.id ?? ""}
         recordTitle={historyRecord?.title ?? ""}
         isAdmin={isAdmin}
+        currentValues={{
+          title: historyRecord?.title ?? "",
+          serviceName: historyRecord?.serviceName ?? null,
+          url: historyRecord?.url ?? null,
+          username: historyRecord?.username ?? null,
+        }}
       />
 
       {categories && moveTarget && (

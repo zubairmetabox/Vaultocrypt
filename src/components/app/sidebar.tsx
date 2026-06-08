@@ -16,6 +16,7 @@ import {
   Settings2,
   Share2,
 } from "lucide-react";
+import { UserButton, SignInButton, useUser } from "@clerk/nextjs";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { useRole } from "@/contexts/role";
 
@@ -45,9 +46,10 @@ type SidebarProps = {
   pathname: string;
   categories: CategoryWithProjects[];
   pendingCategoryIds?: string[];
+  clerkEnabled?: boolean;
 };
 
-export function Sidebar({ pathname, categories, pendingCategoryIds = [] }: SidebarProps) {
+export function Sidebar({ pathname, categories, pendingCategoryIds = [], clerkEnabled = false }: SidebarProps) {
   const router = useRouter();
   const role = useRole();
 
@@ -192,6 +194,13 @@ export function Sidebar({ pathname, categories, pendingCategoryIds = [] }: Sideb
               </Link>
             );
           })}
+
+          {clerkEnabled && (
+            <>
+              <div className="my-1 border-t border-border/40" />
+              <SidebarUser />
+            </>
+          )}
         </div>
       </nav>
 
@@ -202,6 +211,49 @@ export function Sidebar({ pathname, categories, pendingCategoryIds = [] }: Sideb
         onRefresh={() => router.refresh()}
       />
     </aside>
+  );
+}
+
+// ─── SidebarUser ─────────────────────────────────────────────────────────────
+
+function SidebarUser() {
+  const { isLoaded, isSignedIn, user } = useUser();
+
+  if (!isLoaded) return null;
+
+  if (!isSignedIn) {
+    return (
+      <SignInButton mode="modal">
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 rounded-[1.25rem] px-3 py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-muted/70 hover:text-foreground"
+        >
+          Sign in
+        </button>
+      </SignInButton>
+    );
+  }
+
+  const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username || "Account";
+  const email = user.primaryEmailAddress?.emailAddress ?? "";
+
+  return (
+    <div className="flex items-center gap-3 rounded-[1.25rem] px-3 py-2.5">
+      <UserButton
+        appearance={{
+          elements: {
+            avatarBox: "size-7 ring-0 shadow-none",
+            userButtonTrigger: "flex items-center justify-center rounded-full p-0",
+          },
+        }}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground leading-tight">{name}</p>
+        {email && (
+          <p className="truncate text-xs text-muted-foreground leading-tight">{email}</p>
+        )}
+      </div>
+    </div>
   );
 }
 

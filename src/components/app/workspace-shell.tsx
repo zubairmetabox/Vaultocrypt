@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { GripVertical, Menu, Search, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -17,7 +17,6 @@ import {
 
 import { BrandMark } from "@/components/app/brand-mark";
 import { CategoryActions } from "@/components/app/category-actions";
-import { HeaderAuth } from "@/components/app/header-auth";
 import { Sidebar } from "@/components/app/sidebar";
 import { Button } from "@/components/ui/button";
 
@@ -62,6 +61,8 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
   const [activeDrag, setActiveDrag] = useState<{ projectName: string } | null>(null);
   const [pendingCategoryIds, setPendingCategoryIds] = useState<string[]>([]);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
   const { title: dynamicTitle } = useClientTitle();
 
   // Close mobile nav on navigation
@@ -80,7 +81,14 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
   useEffect(() => {
     setSearchValue("");
     setQuery("");
+    setMobileSearchOpen(false);
   }, [pathname, setQuery]);
+
+  useEffect(() => {
+    if (mobileSearchOpen) {
+      mobileSearchInputRef.current?.focus();
+    }
+  }, [mobileSearchOpen]);
 
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
     const v = e.target.value;
@@ -177,6 +185,7 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
             pathname={pathname}
             categories={categories}
             pendingCategoryIds={isPending ? pendingCategoryIds : []}
+            clerkEnabled={clerkEnabled}
           />
         </div>
       </div>
@@ -185,31 +194,56 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
       <div className="mx-auto grid h-full max-w-[1820px] gap-4 p-3 sm:p-4 lg:grid-cols-[280px_1fr]">
         {/* Desktop sidebar */}
         <div className="hidden h-full lg:block">
-          <Sidebar pathname={pathname} categories={categories} pendingCategoryIds={isPending ? pendingCategoryIds : []} />
+          <Sidebar pathname={pathname} categories={categories} pendingCategoryIds={isPending ? pendingCategoryIds : []} clerkEnabled={clerkEnabled} />
         </div>
 
         <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2rem] border border-border/80 bg-background shadow-[0_30px_100px_-50px_rgba(15,23,42,0.45)]">
-          <header className="sticky top-0 z-20 border-b border-border/70 bg-background px-4 py-4 sm:px-6">
-            <div className="flex flex-col gap-4">
+          <header className="sticky top-0 z-20 border-b border-border/70 bg-background px-4 py-2 sm:px-6">
+            <div className="flex flex-col gap-2">
 
               {/* Top bar */}
-              <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 lg:flex">
-                {/* Burger (mobile only) */}
+              <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2 lg:flex lg:gap-3">
+
+                {/* Burger — fades out (keeps space) when search expands */}
                 <Button
                   variant="outline"
                   size="icon-sm"
-                  className="lg:hidden"
+                  className={`transition-opacity duration-200 lg:hidden ${mobileSearchOpen ? "pointer-events-none opacity-0" : "opacity-100"}`}
                   onClick={() => setMobileNavOpen(true)}
+                  tabIndex={mobileSearchOpen ? -1 : undefined}
                 >
                   <Menu className="size-4" />
                   <span className="sr-only">Open navigation</span>
                 </Button>
 
-                {/* Center: logo on mobile, search on desktop */}
-                <div className="flex min-w-0 items-center justify-center lg:flex-1 lg:justify-start">
-                  <div className="lg:hidden">
-                    <BrandMark compact />
+                {/* Center */}
+                <div className="relative flex min-w-0 items-center justify-center lg:flex-1 lg:justify-start">
+                  {/* Mobile logo — fades out when search opens, keeps layout height */}
+                  <div
+                    className={`transition-all duration-200 lg:hidden ${
+                      mobileSearchOpen ? "pointer-events-none opacity-0 scale-95" : "opacity-100 scale-100"
+                    }`}
+                  >
+                    <BrandMark plain />
                   </div>
+
+                  {/* Mobile search input — overlays logo position */}
+                  <div
+                    className={`absolute inset-0 flex items-center gap-2 rounded-[1.25rem] border border-border/70 bg-card/70 px-3 transition-all duration-200 lg:hidden ${
+                      mobileSearchOpen ? "opacity-100 scale-100" : "pointer-events-none opacity-0 scale-95"
+                    }`}
+                  >
+                    <Search className="size-3.5 shrink-0 text-muted-foreground" />
+                    <input
+                      ref={mobileSearchInputRef}
+                      value={searchValue}
+                      onChange={handleSearchChange}
+                      placeholder="Search…"
+                      className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                    />
+                  </div>
+
+                  {/* Desktop: always-visible search bar */}
                   <div className="hidden w-full max-w-xl lg:flex items-center gap-2 rounded-[1.25rem] border border-border/70 bg-card/70 px-3 py-2 shadow-sm">
                     <Search className="size-4 text-muted-foreground" />
                     <input
@@ -221,10 +255,38 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
                   </div>
                 </div>
 
-                {/* Avatar (right) */}
-                <div className="flex items-center gap-2">
-                  <HeaderAuth clerkEnabled={clerkEnabled} />
+                {/* Right slot: search ↔ close cross-fade (mobile only) */}
+                <div className="relative flex size-7 shrink-0 items-center justify-center lg:hidden">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className={`absolute transition-all duration-200 ${
+                      mobileSearchOpen ? "pointer-events-none opacity-0 rotate-90 scale-50" : "opacity-100 rotate-0 scale-100"
+                    }`}
+                    onClick={() => setMobileSearchOpen(true)}
+                    tabIndex={mobileSearchOpen ? -1 : undefined}
+                  >
+                    <Search className="size-4" />
+                    <span className="sr-only">Search</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className={`absolute transition-all duration-200 ${
+                      mobileSearchOpen ? "opacity-100 rotate-0 scale-100" : "pointer-events-none opacity-0 -rotate-90 scale-50"
+                    }`}
+                    onClick={() => {
+                      setMobileSearchOpen(false);
+                      setSearchValue("");
+                      setQuery("");
+                    }}
+                    tabIndex={mobileSearchOpen ? undefined : -1}
+                  >
+                    <X className="size-4" />
+                    <span className="sr-only">Close search</span>
+                  </Button>
                 </div>
+
               </div>
 
               {/* Breadcrumb / page title row */}
