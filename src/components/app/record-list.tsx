@@ -662,21 +662,9 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                         </>
                       )}
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="whitespace-nowrap text-xs text-muted-foreground">
-                          {isOptimistic ? "Saving…" : `Updated ${formatDate(record.updatedAt)}`}
-                        </p>
-                        {!isOptimistic && (
-                          <button
-                            onClick={() => hasBeenEdited && setHistoryRecord({ id: record.id, title: record.title, serviceName: record.serviceName, url: record.url, username: record.username })}
-                            disabled={!hasBeenEdited}
-                            className={`flex items-center gap-1 text-xs transition-colors ${hasBeenEdited ? "text-muted-foreground/50 hover:text-muted-foreground" : "cursor-default text-muted-foreground/20"}`}
-                          >
-                            <History className="size-3" />
-                            History
-                          </button>
-                        )}
-                      </div>
+                      <p className="whitespace-nowrap text-xs text-muted-foreground">
+                        {isOptimistic ? "Saving…" : `Updated ${formatDate(record.updatedAt)}`}
+                      </p>
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center">
