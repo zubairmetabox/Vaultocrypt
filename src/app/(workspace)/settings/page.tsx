@@ -1,4 +1,4 @@
-import { Archive, AlertTriangle, LockKeyhole, Mail, SunMoon, Users } from "lucide-react";
+import { Archive, AlertTriangle, Mail, SunMoon, Users } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
 
 import { TeamSettings } from "@/components/app/team-settings";
@@ -72,23 +72,6 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <TeamSettings admins={admins} />
-          </CardContent>
-        </Card>
-      )}
-
-      {isAdmin && (
-        <Card className="border-border/70 lg:col-span-2">
-          <CardHeader>
-            <div className="flex size-11 items-center justify-center rounded-[1.25rem] bg-muted">
-              <LockKeyhole className="size-4" />
-            </div>
-            <CardTitle className="mt-3">Restrictions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-              Sensitive clients and records can be flagged as exceptions without
-              changing the shared-first model.
-            </p>
           </CardContent>
         </Card>
       )}

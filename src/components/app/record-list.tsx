@@ -122,7 +122,8 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
   const [editError, setEditError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
-  const [moveTarget, setMoveTarget] = useState<{ id: string; title: string } | null>(null);
+  const [moveTarget, setMoveTarget] = useState<{ ids: string[]; titles: string[] } | null>(null);
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const [openNote, setOpenNote] = useState<OpenNoteState>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [shareOpen, setShareOpen] = useState(false);
@@ -451,15 +452,53 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                 className="shrink-0"
               />
             )}
-            <div className="space-y-1">
-              <CardTitle>Records / Notes</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Credentials stay structured. Notes feel lighter and faster to scan.
-              </p>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle>Records / Notes</CardTitle>
+                {selectedIds.size > 0 && (
+                  <>
+                    <span className="text-sm text-muted-foreground">
+                      {selectedIds.size} selected
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedIds(new Set())}
+                      className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                    >
+                      Clear
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {isAdmin && categories && categories.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={selectedIds.size === 0}
+                onClick={() => {
+                  const selected = displayRecords.filter((r) => selectedIds.has(r.id));
+                  setBulkMoveOpen(true);
+                  setMoveTarget({ ids: selected.map((r) => r.id), titles: selected.map((r) => r.title) });
+                }}
+              >
+                <ArrowRightLeft className="size-4" />
+                Move
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={selectedIds.size === 0}
+              onClick={() => setShareOpen(true)}
+            >
+              <Share2 className="size-4" />
+              Share
+            </Button>
+            <div className="h-4 w-px bg-border/70" />
             <Button size="sm" variant="outline" onClick={() => openCreateDialog("secure_note")}>
               <FileText className="size-4" />
               Add note
@@ -729,7 +768,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => setMoveTarget({ id: record.id, title: record.title })}
+                          onClick={() => { setMoveTarget({ ids: [record.id], titles: [record.title] }); setBulkMoveOpen(true); }}
                           disabled={isOptimistic}
                         >
                           <ArrowRightLeft className="size-4" />
@@ -829,25 +868,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
         </DialogContent>
       </Dialog>
 
-      {/* Floating share bar */}
-      {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
-          <div className="flex items-center gap-3 rounded-2xl border border-border/80 bg-card/95 px-4 py-3 shadow-2xl shadow-slate-950/40 backdrop-blur-md">
-            <span className="text-sm font-medium text-foreground">
-              {selectedIds.size} {selectedIds.size === 1 ? "record" : "records"} selected
-            </span>
-            <Button size="sm" variant="outline" onClick={() => setSelectedIds(new Set())}>
-              Clear
-            </Button>
-            <Button size="sm" onClick={() => setShareOpen(true)}>
-              <Share2 className="size-4" />
-              Share
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <ShareModal
+<ShareModal
         open={shareOpen}
         onOpenChange={(open) => {
           setShareOpen(open);
@@ -875,12 +896,13 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
 
       {categories && moveTarget && (
         <MoveRecordDialog
-          open={Boolean(moveTarget)}
+          open={bulkMoveOpen}
           onOpenChange={(open) => {
+            setBulkMoveOpen(open);
             if (!open) setMoveTarget(null);
           }}
-          recordId={moveTarget.id}
-          recordTitle={moveTarget.title}
+          recordIds={moveTarget.ids}
+          recordTitles={moveTarget.titles}
           currentProjectId={projectId}
           categories={categories}
         />

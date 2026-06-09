@@ -43,8 +43,8 @@ type Step = "category" | "project";
 type Props = {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  recordId: string;
-  recordTitle: string;
+  recordIds: string[];
+  recordTitles: string[];
   currentProjectId: string;
   categories: CategoryWithProjects[];
 };
@@ -54,11 +54,13 @@ type Props = {
 export function MoveRecordDialog({
   open,
   onOpenChange,
-  recordId,
-  recordTitle,
+  recordIds,
+  recordTitles,
   currentProjectId,
   categories,
 }: Props) {
+  const isBulk = recordIds.length > 1;
+  const recordTitle = isBulk ? `${recordIds.length} records` : (recordTitles[0] ?? "");
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -99,12 +101,14 @@ export function MoveRecordDialog({
     setPendingMove(true);
     startTransition(async () => {
       try {
-        await moveRecord(recordId, currentProjectId, selectedProjectId);
+        await Promise.all(
+          recordIds.map((id) => moveRecord(id, currentProjectId, selectedProjectId)),
+        );
         emitLiveAuditEvent({ action: "RECORD_UPDATED", targetLabel: recordTitle });
         router.refresh();
       } catch {
         setPendingMove(false);
-        setError("Failed to move record. Please try again.");
+        setError("Failed to move record(s). Please try again.");
       }
     });
   }
@@ -121,10 +125,9 @@ export function MoveRecordDialog({
       <Dialog open={open} onOpenChange={() => {}}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Moving record</DialogTitle>
+            <DialogTitle>Moving {recordTitle}</DialogTitle>
             <DialogDescription>
-              Transferring{" "}
-              <span className="font-medium text-foreground">{recordTitle}</span>…
+              Transferring to the selected project…
             </DialogDescription>
           </DialogHeader>
           <DialogBody>
@@ -145,10 +148,9 @@ export function MoveRecordDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Move record</DialogTitle>
+            <DialogTitle>Move {recordTitle}</DialogTitle>
             <DialogDescription>
-              Choose a category to move{" "}
-              <span className="font-medium text-foreground">{recordTitle}</span> to.
+              Choose a destination category then pick a project.
             </DialogDescription>
           </DialogHeader>
 
@@ -194,8 +196,7 @@ export function MoveRecordDialog({
         <DialogHeader>
           <DialogTitle>{selectedCategory?.name}</DialogTitle>
           <DialogDescription>
-            Select a project to move{" "}
-            <span className="font-medium text-foreground">{recordTitle}</span> to.
+            Select a project to move <span className="font-medium text-foreground">{recordTitle}</span> to.
           </DialogDescription>
         </DialogHeader>
 

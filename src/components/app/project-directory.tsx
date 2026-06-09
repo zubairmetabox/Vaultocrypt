@@ -24,7 +24,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -345,9 +344,6 @@ export function ProjectDirectory({ initialProjects, categories, defaultCategoryI
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <CardTitle>Project directory</CardTitle>
-            <CardDescription>
-              Name-led scanning, visible security posture, and fast access to the next action.
-            </CardDescription>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">

@@ -7,7 +7,7 @@ import {
   Activity,
   AlertCircle,
   Building2,
-  ChevronDown,
+  Minus,
   Folder,
   FolderKanban,
   Lock,
@@ -326,13 +326,11 @@ function CategorySection({
             </Link>
             {/* Spacer: fills gap between text and chevron, click bubbles → toggle only */}
             <span className="flex-1 self-stretch" />
-            {/* Chevron: click bubbles up to outer div → toggle only */}
-            <ChevronDown
-              className={cn(
-                "size-4 shrink-0 cursor-pointer transition-transform duration-200",
-                open && "rotate-180",
-              )}
-            />
+            {/* Toggle icon: + when closed, – when open */}
+            {open
+              ? <Minus className="size-4 shrink-0 cursor-pointer text-muted-foreground" />
+              : <Plus className="size-4 shrink-0 cursor-pointer text-muted-foreground" />
+            }
           </>
         )}
       </div>
