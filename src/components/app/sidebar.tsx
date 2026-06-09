@@ -108,7 +108,7 @@ export function Sidebar({ pathname, categories, pendingCategoryIds = [], clerkEn
   const personalCat = categories.find((c) => c.isPersonal) ?? null;
 
   return (
-    <aside className="flex h-full min-h-0 w-full flex-col rounded-[2rem] border border-border/70 bg-sidebar p-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
+    <aside className="flex w-full flex-1 min-h-0 flex-col rounded-[2rem] border border-border/70 bg-sidebar p-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
       <BrandMark />
 
       {/* ── Scrollable categories ────────────────────────────────────────── */}

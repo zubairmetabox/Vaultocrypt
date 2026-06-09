@@ -180,7 +180,7 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
             <span className="sr-only">Close navigation</span>
           </Button>
         </div>
-        <div className="flex-1 overflow-y-auto p-3">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
           <Sidebar
             pathname={pathname}
             categories={categories}
@@ -193,7 +193,7 @@ function WorkspaceShellInner({ children, clerkEnabled, categories }: WorkspaceSh
       {/* ── Main layout ──────────────────────────────────────────────────── */}
       <div className="mx-auto grid h-full max-w-[1820px] gap-4 p-3 sm:p-4 lg:grid-cols-[280px_1fr]">
         {/* Desktop sidebar */}
-        <div className="hidden h-full lg:block">
+        <div className="hidden h-full min-h-0 overflow-hidden lg:flex lg:flex-col">
           <Sidebar pathname={pathname} categories={categories} pendingCategoryIds={isPending ? pendingCategoryIds : []} clerkEnabled={clerkEnabled} />
         </div>
 
