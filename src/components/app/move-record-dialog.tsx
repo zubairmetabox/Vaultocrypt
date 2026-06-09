@@ -154,7 +154,7 @@ export function MoveRecordDialog({
 
           <DialogBody>
             <div className="space-y-2">
-              {categories.map((cat) => {
+              {categories.filter((cat) => !cat.isPersonal).map((cat) => {
                 const Icon = CATEGORY_ICONS[cat.slug] ?? Folder;
                 return (
                   <button

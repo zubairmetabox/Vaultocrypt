@@ -177,7 +177,7 @@ export function ProjectDetailsCard({
   // ── Derived ────────────────────────────────────────────────────────────────
 
   const activeCategory = categories.find((c) => c.id === activeCategoryId);
-  const otherCategories = categories.filter((c) => c.id !== activeCategoryId);
+  const otherCategories = categories.filter((c) => c.id !== activeCategoryId && !c.isPersonal);
 
   return (
     <Card className="border-border/70 bg-card/95">
