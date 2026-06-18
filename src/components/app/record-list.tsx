@@ -7,9 +7,11 @@ import {
   ArrowRightLeft,
   ClipboardCheck,
   Copy,
+  Download,
   Eye,
   EyeOff,
   Expand,
+  FileCode2,
   FileText,
   History,
   KeyRound,
@@ -18,6 +20,7 @@ import {
   Plus,
   Share2,
   Trash2,
+  Upload,
 } from "lucide-react";
 
 import { MoveRecordDialog } from "@/components/app/move-record-dialog";
@@ -28,6 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +46,7 @@ import {
   createRecord,
   revealSecret,
   updateRecord,
+  uploadEnvFile,
 } from "@/lib/actions/records";
 import { emitLiveAuditEvent } from "@/lib/audit-client";
 import type { CategoryWithProjects } from "@/lib/actions/categories";
@@ -65,11 +70,22 @@ type RecordListProps = {
 
 type DeleteTarget = { id: string; title: string } | null;
 type CreateType = "credential" | "secure_note";
-type OpenNoteState = {
+
+function downloadText(filename: string, content: string) {
+  const blob = new Blob([content], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+type OpenRecordState = {
   id: string;
   title: string;
   content: string;
   isLoading: boolean;
+  type: "secure_note" | "env_file";
 } | null;
 
 function isOptimisticRecord(recordId: string) {
@@ -104,6 +120,13 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
   const [isCreating, startCreate] = useTransition();
   const [isEditing, startEdit] = useTransition();
   const [isDeleting, startDelete] = useTransition();
+  const [isUploading, startUpload] = useTransition();
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const envFileInputRef = useRef<HTMLInputElement>(null);
+  const [isSavingEnvEdit, startSaveEnvEdit] = useTransition();
+  const [envEditMode, setEnvEditMode] = useState(false);
+  const [envEditValue, setEnvEditValue] = useState("");
+  const [envEditError, setEnvEditError] = useState<string | null>(null);
 
   const [records, setRecords] = useState<RecordItem[]>(initialRecords);
   useEffect(() => {
@@ -124,7 +147,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [moveTarget, setMoveTarget] = useState<{ ids: string[]; titles: string[] } | null>(null);
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
-  const [openNote, setOpenNote] = useState<OpenNoteState>(null);
+  const [openRecord, setOpenRecord] = useState<OpenRecordState>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [shareOpen, setShareOpen] = useState(false);
   const [historyRecord, setHistoryRecord] = useState<{
@@ -210,20 +233,23 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
     emitLiveAuditEvent({ action: "SECRET_COPIED", targetLabel: record.title });
   }, []);
 
-  async function handleOpenNote(record: RecordItem) {
-    if (record.type !== "secure_note" || isOptimisticRecord(record.id)) return;
+  async function handleOpenRecord(record: RecordItem) {
+    if ((record.type !== "secure_note" && record.type !== "env_file") || isOptimisticRecord(record.id)) return;
 
+    setEnvEditMode(false);
+    setEnvEditError(null);
     const hasEncryptedContent = Boolean(record.hasEncryptedContent);
     const cachedContent = revealedSecrets.get(record.id);
     const initialContent = hasEncryptedContent
       ? cachedContent ?? ""
       : record.notes || "";
 
-    setOpenNote({
+    setOpenRecord({
       id: record.id,
       title: record.title,
       content: initialContent,
       isLoading: hasEncryptedContent && !cachedContent,
+      type: record.type,
     });
 
     if (!hasEncryptedContent || cachedContent) return;
@@ -232,15 +258,15 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
       const secret = await revealSecret(record.id);
       setRevealedSecrets((prev) => new Map(prev).set(record.id, secret));
       emitLiveAuditEvent({ action: "SECRET_REVEALED", targetLabel: record.title });
-      setOpenNote((current) =>
+      setOpenRecord((current) =>
         current && current.id === record.id
           ? { ...current, content: secret, isLoading: false }
           : current,
       );
     } catch {
-      setOpenNote((current) =>
+      setOpenRecord((current) =>
         current && current.id === record.id
-          ? { ...current, content: "Unable to open note right now.", isLoading: false }
+          ? { ...current, content: "Unable to open right now.", isLoading: false }
           : current,
       );
     }
@@ -250,6 +276,98 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
     setCreateType(type);
     setCreateError(null);
     setCreateOpen(true);
+  }
+
+  function handleUploadEnvFileClick() {
+    envFileInputRef.current?.click();
+  }
+
+  async function handleEnvFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setUploadError(null);
+    const content = await file.text();
+
+    startUpload(async () => {
+      try {
+        await uploadEnvFile(projectId, file.name, content);
+        emitLiveAuditEvent({ action: "RECORD_CREATED", targetLabel: file.name });
+        router.refresh();
+      } catch {
+        setUploadError(`Failed to upload ${file.name}. Please try again.`);
+      }
+    });
+  }
+
+  async function handleDownload(record: RecordItem) {
+    const cached = revealedSecrets.get(record.id);
+    const content = cached ?? (await revealSecret(record.id));
+    if (!cached) {
+      setRevealedSecrets((prev) => new Map(prev).set(record.id, content));
+    }
+    downloadText(record.title, content);
+  }
+
+  async function handleEditEnvFile(record: RecordItem) {
+    if (record.type !== "env_file" || isOptimisticRecord(record.id)) return;
+
+    setEnvEditError(null);
+    const cachedContent = revealedSecrets.get(record.id);
+
+    setOpenRecord({
+      id: record.id,
+      title: record.title,
+      content: cachedContent ?? "",
+      isLoading: !cachedContent,
+      type: "env_file",
+    });
+    setEnvEditValue(cachedContent ?? "");
+    setEnvEditMode(true);
+
+    if (cachedContent) return;
+
+    try {
+      const secret = await revealSecret(record.id);
+      setRevealedSecrets((prev) => new Map(prev).set(record.id, secret));
+      emitLiveAuditEvent({ action: "SECRET_REVEALED", targetLabel: record.title });
+      setOpenRecord((current) =>
+        current && current.id === record.id ? { ...current, content: secret, isLoading: false } : current,
+      );
+      setEnvEditValue(secret);
+    } catch {
+      setOpenRecord((current) =>
+        current && current.id === record.id
+          ? { ...current, content: "Unable to open right now.", isLoading: false }
+          : current,
+      );
+    }
+  }
+
+  function handleSaveEnvEdit() {
+    if (!openRecord || openRecord.type !== "env_file") return;
+    setEnvEditError(null);
+    const { id, title } = openRecord;
+    const newContent = envEditValue;
+
+    startSaveEnvEdit(async () => {
+      try {
+        await uploadEnvFile(projectId, title, newContent);
+        setRevealedSecrets((prev) => new Map(prev).set(id, newContent));
+        setRecords((prev) =>
+          prev.map((r) => (r.id === id ? { ...r, hasHistory: true, updatedAt: new Date() } : r)),
+        );
+        setOpenRecord((current) =>
+          current && current.id === id ? { ...current, content: newContent } : current,
+        );
+        emitLiveAuditEvent({ action: "RECORD_UPDATED", targetLabel: title });
+        setEnvEditMode(false);
+        router.refresh();
+      } catch {
+        setEnvEditError("Failed to save changes. Please try again.");
+      }
+    });
   }
 
   function handleSaveNew(draft: RecordDraft) {
@@ -499,6 +617,16 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
               Share
             </Button>
             <div className="h-4 w-px bg-border/70" />
+            <input
+              ref={envFileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleEnvFileSelected}
+            />
+            <Button size="sm" variant="outline" onClick={handleUploadEnvFileClick} disabled={isUploading}>
+              {isUploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+              Upload .env
+            </Button>
             <Button size="sm" variant="outline" onClick={() => openCreateDialog("secure_note")}>
               <FileText className="size-4" />
               Add note
@@ -509,6 +637,13 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
             </Button>
           </div>
         </CardHeader>
+
+        {uploadError && (
+          <div className="mx-6 mb-2 flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            <AlertCircle className="size-4 shrink-0" />
+            {uploadError}
+          </div>
+        )}
 
         <CardContent className="space-y-3">
           {records.length === 0 ? (
@@ -523,6 +658,10 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                 </p>
               </div>
               <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button size="sm" variant="outline" onClick={handleUploadEnvFileClick} disabled={isUploading}>
+                  {isUploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                  Upload .env
+                </Button>
                 <Button size="sm" variant="outline" onClick={() => openCreateDialog("secure_note")}>
                   <FileText className="size-4" />
                   Add note
@@ -545,6 +684,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
               const isRevealing = revealingId === record.id;
               const isCopied = copiedId === record.id;
               const isNote = record.type === "secure_note";
+              const isEnvFile = record.type === "env_file";
               const isOptimistic = isOptimisticRecord(record.id);
               const canServerReveal = !isNote || record.hasEncryptedContent;
               const secretDisplay = isRevealed ? (secret || "—") : "•".repeat(18);
@@ -582,15 +722,23 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                         >
                           {isNote ? (
                             <FileText className="size-4" />
+                          ) : isEnvFile ? (
+                            <FileCode2 className="size-3.5 text-muted-foreground" />
                           ) : (
                             <KeyRound className="size-3.5 text-muted-foreground" />
                           )}
                         </div>
                         <p className="font-medium text-foreground">{record.title}</p>
                         <Badge variant="outline" className="text-xs">
-                          {isNote ? "note" : "credential"}
+                          {isNote ? "note" : isEnvFile ? "env file" : "credential"}
                         </Badge>
                       </div>
+
+                      {isEnvFile ? (
+                        <p className="text-xs text-muted-foreground">
+                          Uploaded by {record.uploadedBy ?? "Unknown"}
+                        </p>
+                      ) : null}
 
                       {isNote ? (
                         <div className="space-y-2">
@@ -648,17 +796,23 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                             )}
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            <code
-                              className={`rounded-lg border border-border/50 bg-muted/60 px-2.5 py-1 text-xs ${
-                                isRevealed
-                                  ? "font-mono text-foreground"
-                                  : "select-none tracking-[0.3em] text-muted-foreground"
-                              }`}
-                            >
+                          {isEnvFile && isRevealed ? (
+                            <pre className="max-h-48 overflow-y-auto rounded-lg border border-border/50 bg-muted/60 px-2.5 py-2 text-xs font-mono whitespace-pre-wrap text-foreground">
                               {secretDisplay}
-                            </code>
-                          </div>
+                            </pre>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <code
+                                className={`rounded-lg border border-border/50 bg-muted/60 px-2.5 py-1 text-xs ${
+                                  isRevealed
+                                    ? "font-mono text-foreground"
+                                    : "select-none tracking-[0.3em] text-muted-foreground"
+                                }`}
+                              >
+                                {secretDisplay}
+                              </code>
+                            </div>
+                          )}
                         </>
                       )}
 
@@ -668,11 +822,11 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center">
-                      {isNote && (
+                      {(isNote || isEnvFile) && (
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleOpenNote(record)}
+                          onClick={() => handleOpenRecord(record)}
                           disabled={isOptimistic}
                         >
                           <Expand className="size-4" />
@@ -726,19 +880,42 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                         )}
                       </Button>
 
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleEditClick(record)}
-                        disabled={isOptimistic || editLoadingId === record.id}
-                      >
-                        {editLoadingId === record.id ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                          <PencilLine className="size-4" />
-                        )}
-                        Edit
-                      </Button>
+                      {isEnvFile ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditEnvFile(record)}
+                            disabled={isOptimistic}
+                          >
+                            <PencilLine className="size-4" />
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownload(record)}
+                            disabled={isOptimistic}
+                          >
+                            <Download className="size-4" />
+                            Download
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEditClick(record)}
+                          disabled={isOptimistic || editLoadingId === record.id}
+                        >
+                          {editLoadingId === record.id ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <PencilLine className="size-4" />
+                          )}
+                          Edit
+                        </Button>
+                      )}
 
                       <Button
                         size="sm"
@@ -897,49 +1074,141 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
       )}
 
       <Dialog
-        open={Boolean(openNote)}
+        open={Boolean(openRecord)}
         onOpenChange={(open) => {
-          if (!open) setOpenNote(null);
+          if (!open && !isSavingEnvEdit) {
+            setOpenRecord(null);
+            setEnvEditMode(false);
+            setEnvEditError(null);
+          }
         }}
       >
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{openNote?.title ?? "Note"}</DialogTitle>
+            <DialogTitle>{openRecord?.title ?? (openRecord?.type === "env_file" ? "Env file" : "Note")}</DialogTitle>
             <DialogDescription>
-              Full note view with revealed content.
+              {openRecord?.type === "env_file"
+                ? envEditMode
+                  ? "Edit the env file content. Saving replaces your own copy."
+                  : "Full env file view with revealed content."
+                : "Full note view with revealed content."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="px-6 pb-2">
-            <div className="min-h-48 rounded-[1.25rem] border border-border/70 bg-card/70 px-4 py-4">
-              {openNote?.isLoading ? (
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin" />
-                  Revealing note…
-                </div>
-              ) : (
-                <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">
-                  {openNote?.content || "Empty note"}
-                </p>
-              )}
-            </div>
+            {openRecord?.isLoading ? (
+              <div className="flex min-h-48 items-center gap-3 rounded-[1.25rem] border border-border/70 bg-card/70 px-4 py-4 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                {openRecord?.type === "env_file" ? "Revealing file…" : "Revealing note…"}
+              </div>
+            ) : openRecord?.type === "env_file" && envEditMode ? (
+              <Textarea
+                value={envEditValue}
+                onChange={(e) => setEnvEditValue(e.target.value)}
+                rows={14}
+                className="font-mono text-sm"
+                disabled={isSavingEnvEdit}
+              />
+            ) : (
+              <div className="min-h-48 rounded-[1.25rem] border border-border/70 bg-card/70 px-4 py-4">
+                {openRecord?.type === "env_file" ? (
+                  <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap font-mono text-sm leading-6 text-foreground">
+                    {openRecord?.content || "Empty file"}
+                  </pre>
+                ) : (
+                  <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">
+                    {openRecord?.content || "Empty note"}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
+          {envEditError && (
+            <div className="mx-6 flex items-center gap-2 rounded-[0.875rem] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              <AlertCircle className="size-4 shrink-0" />
+              {envEditError}
+            </div>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenNote(null)}>
-              Close
-            </Button>
-            <Button
-              onClick={() => {
-                const record = records.find((r) => r.id === openNote?.id);
-                if (!record) return;
-                setOpenNote(null);
-                handleEditClick(record);
-              }}
-            >
-              <PencilLine className="size-4" />
-              Edit note
-            </Button>
+            {openRecord?.type === "env_file" && envEditMode ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEnvEditMode(false);
+                    setEnvEditError(null);
+                  }}
+                  disabled={isSavingEnvEdit}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveEnvEdit} disabled={isSavingEnvEdit}>
+                  {isSavingEnvEdit && <Loader2 className="size-4 animate-spin" />}
+                  Save changes
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setOpenRecord(null)}>
+                  Close
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    if (!openRecord) return;
+                    if (!navigator.clipboard) return;
+                    try {
+                      await navigator.clipboard.writeText(openRecord.content);
+                      emitLiveAuditEvent({ action: "SECRET_COPIED", targetLabel: openRecord.title });
+                    } catch {
+                      // ignore — best-effort copy
+                    }
+                  }}
+                >
+                  <Copy className="size-4" />
+                  Copy
+                </Button>
+                {openRecord?.type === "env_file" ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const record = records.find((r) => r.id === openRecord?.id);
+                        if (!record) return;
+                        handleDownload(record);
+                      }}
+                    >
+                      <Download className="size-4" />
+                      Download
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        if (!openRecord) return;
+                        setEnvEditValue(openRecord.content);
+                        setEnvEditMode(true);
+                      }}
+                    >
+                      <PencilLine className="size-4" />
+                      Edit
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    onClick={() => {
+                      const record = records.find((r) => r.id === openRecord?.id);
+                      if (!record) return;
+                      setOpenRecord(null);
+                      handleEditClick(record);
+                    }}
+                  >
+                    <PencilLine className="size-4" />
+                    Edit note
+                  </Button>
+                )}
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

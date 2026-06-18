@@ -20,6 +20,7 @@ enum ClientStatus {
 enum RecordType {
   CREDENTIAL
   SECURE_NOTE
+  ENV_FILE
 }
 
 enum RecordSensitivity {

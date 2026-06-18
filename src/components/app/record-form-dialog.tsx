@@ -21,12 +21,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 export type RecordFormInput = {
   title: string;
-  type: "credential" | "secure_note";
+  type: "credential" | "secure_note" | "env_file";
   serviceName: string | null;
   url: string | null;
   username: string | null;
   notes: string | null;
   hasEncryptedContent?: boolean;
+  uploadedBy?: string | null;
 };
 
 export type RecordDraft = {
@@ -67,7 +68,7 @@ const EMPTY_DRAFT: RecordDraft = {
 function toDraft(record: RecordFormInput): RecordDraft {
   return {
     title: record.title,
-    type: record.type,
+    type: record.type === "secure_note" ? "secure_note" : "credential",
     service: record.serviceName ?? "",
     url: record.url ?? "",
     username: record.username ?? "",

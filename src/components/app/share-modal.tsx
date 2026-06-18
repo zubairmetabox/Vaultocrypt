@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/select";
 import { createSharedBundle, type ExpiryOption } from "@/lib/actions/sharing";
 
-type SelectedRecord = { id: string; title: string; type: "credential" | "secure_note" };
+type SelectedRecord = { id: string; title: string; type: "credential" | "secure_note" | "env_file" };
 
 type ShareModalProps = {
   open: boolean;

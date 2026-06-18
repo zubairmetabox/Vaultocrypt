@@ -6,6 +6,7 @@ import { AuditAction, RecordSensitivity, RecordType } from "@prisma/client";
 import { writeAudit } from "@/lib/audit";
 import { decrypt, encrypt } from "@/lib/crypto";
 import { prisma as db } from "@/lib/db";
+import { getCurrentDbUserId } from "@/lib/actions/categories";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -13,7 +14,7 @@ export type RecordRow = {
   id: string;
   projectId: string;
   title: string;
-  type: "CREDENTIAL" | "SECURE_NOTE";
+  type: "CREDENTIAL" | "SECURE_NOTE" | "ENV_FILE";
   serviceName: string | null;
   url: string | null;
   username: string | null;
@@ -21,15 +22,34 @@ export type RecordRow = {
   sensitivity: "STANDARD" | "SENSITIVE";
   isRestricted: boolean;
   hasHistory: boolean;
+  createdById: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
+
+/** Batches a display-name lookup for a set of user ids (e.g. record uploaders). */
+export async function getUserDisplayNames(userIds: (string | null)[]): Promise<Map<string, string>> {
+  const ids = [...new Set(userIds.filter((id): id is string => Boolean(id)))];
+  if (ids.length === 0) return new Map();
+
+  const users = await db.user.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, firstName: true, lastName: true, email: true },
+  });
+
+  return new Map(
+    users.map((u) => [
+      u.id,
+      [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Unknown",
+    ]),
+  );
+}
 
 export type ArchivedRecordRow = {
   id: string;
   projectId: string;
   title: string;
-  type: "CREDENTIAL" | "SECURE_NOTE";
+  type: "CREDENTIAL" | "SECURE_NOTE" | "ENV_FILE";
   serviceName: string | null;
   username: string | null;
   archivedAt: Date;
@@ -67,6 +87,7 @@ export async function getRecords(projectId: string): Promise<RecordRow[]> {
       sensitivity: true,
       isRestricted: true,
       hasHistory: true,
+      createdById: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -381,6 +402,78 @@ export async function moveRecord(recordId: string, fromProjectId: string, toProj
   });
   revalidatePath(`/projects/${fromProjectId}`);
   revalidatePath(`/projects/${toProjectId}`);
+}
+
+/**
+ * Uploads (or re-uploads) a .env file for the current user on a project.
+ * Each dev's file is kept as its own record, keyed by (project, uploader, filename) —
+ * re-uploading the same filename replaces that dev's own copy instead of creating a duplicate.
+ */
+export async function uploadEnvFile(projectId: string, filename: string, content: string) {
+  const { accessibleCategoryIds } = await requireAccess();
+
+  const project = await db.project.findFirst({
+    where: { id: projectId, categoryId: { in: accessibleCategoryIds } },
+    select: { id: true },
+  });
+  if (!project) throw new Error("Unauthorized");
+
+  const currentUserId = await getCurrentDbUserId();
+  const title = filename.trim();
+
+  const existing = await db.record.findFirst({
+    where: {
+      projectId,
+      type: RecordType.ENV_FILE,
+      title,
+      createdById: currentUserId,
+      archivedAt: null,
+    },
+    select: { id: true },
+  });
+
+  if (existing) {
+    const record = await db.record.update({
+      where: { id: existing.id },
+      data: {
+        secretCipher: encrypt(content),
+        hasHistory: true,
+        updatedById: currentUserId,
+      },
+    });
+    await writeAudit({
+      action: AuditAction.RECORD_UPDATED,
+      resource: "record",
+      resourceId: record.id,
+      projectId,
+      recordId: record.id,
+      metadata: { title, type: "ENV_FILE" },
+    });
+    revalidatePath(`/projects/${projectId}`);
+    return record;
+  }
+
+  const record = await db.record.create({
+    data: {
+      projectId,
+      title,
+      type: RecordType.ENV_FILE,
+      secretCipher: encrypt(content),
+      sensitivity: RecordSensitivity.SENSITIVE,
+      createdById: currentUserId,
+      updatedById: currentUserId,
+    },
+  });
+  await writeAudit({
+    action: AuditAction.RECORD_CREATED,
+    resource: "record",
+    resourceId: record.id,
+    projectId,
+    recordId: record.id,
+    metadata: { title, type: "ENV_FILE" },
+  });
+  revalidatePath(`/projects/${projectId}`);
+  return record;
 }
 
 // ─── History ──────────────────────────────────────────────────────────────────
