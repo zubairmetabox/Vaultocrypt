@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { useUser } from "@clerk/nextjs";
 import {
   AlertTriangle,
   ArrowRightLeft,
@@ -97,7 +98,10 @@ function buildTarget(event: ClientAuditEvent): string {
   return "";
 }
 
-function optimisticEventToRow(projectId: string, event: LiveAuditEvent): ClientAuditEvent {
+function optimisticEventToRow(
+  event: LiveAuditEvent,
+  currentActor: { firstName: string | null; lastName: string | null; email: string | null },
+): ClientAuditEvent {
   return {
     id: `optimistic-audit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     action: event.action,
@@ -106,9 +110,9 @@ function optimisticEventToRow(projectId: string, event: LiveAuditEvent): ClientA
     metadata: event.targetLabel ? { recordTitle: event.targetLabel, projectName: event.targetLabel } : null,
     createdAt: event.createdAt ? new Date(event.createdAt) : new Date(),
     actor: {
-      firstName: event.actorName ?? "You",
-      lastName: null,
-      email: event.actorEmail ?? null,
+      firstName: event.actorName ?? currentActor.firstName,
+      lastName: currentActor.lastName,
+      email: event.actorEmail ?? currentActor.email,
     },
     project: null,
     record: event.targetLabel ? { title: event.targetLabel } : null,
@@ -117,6 +121,7 @@ function optimisticEventToRow(projectId: string, event: LiveAuditEvent): ClientA
 }
 
 export function ProjectAuditTrail({ initialEvents, projectId, role }: Props) {
+  const { user } = useUser();
   const [events, setEvents] = useState<ClientAuditEvent[]>(initialEvents);
   const [hasMore, setHasMore] = useState(initialEvents.length === 10);
   const [loadedServerCount, setLoadedServerCount] = useState(initialEvents.length);
@@ -135,10 +140,15 @@ export function ProjectAuditTrail({ initialEvents, projectId, role }: Props) {
 
   useEffect(() => {
     return subscribeToLiveAuditEvents((event) => {
-      setEvents((current) => [optimisticEventToRow(projectId, event), ...current]);
+      const currentActor = {
+        firstName: user?.firstName ?? null,
+        lastName: user?.lastName ?? null,
+        email: user?.primaryEmailAddress?.emailAddress ?? null,
+      };
+      setEvents((current) => [optimisticEventToRow(event, currentActor), ...current]);
       setLoadedServerCount((current) => current + 1);
     });
-  }, [projectId]);
+  }, [projectId, user]);
 
   function handleLoadMore() {
     startLoadingMore(async () => {
