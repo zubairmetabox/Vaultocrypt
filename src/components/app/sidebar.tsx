@@ -293,7 +293,7 @@ function CategorySection({
       ? "cursor-default text-muted-foreground opacity-60"
       : isOver
         ? "border border-primary/50 bg-primary/10 text-foreground shadow-lg shadow-slate-950/10"
-        : active
+        : active || open
           ? "border border-border/80 bg-accent text-accent-foreground shadow-lg shadow-slate-950/10"
           : isPersonal
             ? "border border-primary/20 bg-primary/5 text-foreground/80 hover:bg-primary/10 hover:text-foreground"
