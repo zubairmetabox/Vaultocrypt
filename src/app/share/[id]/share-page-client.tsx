@@ -51,6 +51,7 @@ export function SharePageClient({ bundleId }: SharePageClientProps) {
 
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -162,6 +163,20 @@ export function SharePageClient({ bundleId }: SharePageClientProps) {
     }
     setCopiedId(record.id);
     setTimeout(() => setCopiedId((p) => (p === record.id ? null : p)), 2000);
+  }
+
+  async function copyFieldValue(key: string, value: string) {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      const el = document.createElement("textarea");
+      el.value = value; el.style.cssText = "position:fixed;opacity:0";
+      document.body.appendChild(el); el.select();
+      document.execCommand("copy"); document.body.removeChild(el);
+    }
+    setCopiedField(key);
+    setTimeout(() => setCopiedField((p) => (p === key ? null : p)), 1500);
   }
 
   // ── Expiry warning ────────────────────────────────────────────────────────
@@ -339,6 +354,18 @@ export function SharePageClient({ bundleId }: SharePageClientProps) {
                             className="min-w-0 truncate text-sm text-foreground hover:underline">
                             {record.serviceName || record.url}
                           </a>
+                          <button
+                            type="button"
+                            onClick={() => copyFieldValue(`${record.id}:url`, record.url || "")}
+                            title={copiedField === `${record.id}:url` ? "Copied" : "Copy"}
+                            className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                          >
+                            {copiedField === `${record.id}:url` ? (
+                              <ClipboardCheck className="size-3.5 text-primary" />
+                            ) : (
+                              <Copy className="size-3.5" />
+                            )}
+                          </button>
                         </div>
                       )}
                       {!record.url && record.serviceName && (
@@ -351,6 +378,18 @@ export function SharePageClient({ bundleId }: SharePageClientProps) {
                         <div className="flex items-baseline gap-2">
                           <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">Username</span>
                           <span className="min-w-0 truncate text-sm text-foreground">{record.username}</span>
+                          <button
+                            type="button"
+                            onClick={() => copyFieldValue(`${record.id}:username`, record.username || "")}
+                            title={copiedField === `${record.id}:username` ? "Copied" : "Copy"}
+                            className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                          >
+                            {copiedField === `${record.id}:username` ? (
+                              <ClipboardCheck className="size-3.5 text-primary" />
+                            ) : (
+                              <Copy className="size-3.5" />
+                            )}
+                          </button>
                         </div>
                       )}
                     </div>
@@ -366,11 +405,26 @@ export function SharePageClient({ bundleId }: SharePageClientProps) {
                         </p>
                       </div>
                     ) : hasSecret ? (
-                      <code className={`inline-block rounded-lg border border-border/50 bg-muted/60 px-2.5 py-1 text-xs ${
-                        isRevealed ? "font-mono text-foreground" : "select-none tracking-[0.3em] text-muted-foreground"
-                      }`}>
-                        {isRevealed ? (record.secret || "—") : "•".repeat(18)}
-                      </code>
+                      <div className="flex items-baseline gap-2">
+                        <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">Password</span>
+                        <code className={`inline-block rounded-lg border border-border/50 bg-muted/60 px-2.5 py-1 text-xs ${
+                          isRevealed ? "font-mono text-foreground" : "select-none tracking-[0.3em] text-muted-foreground"
+                        }`}>
+                          {isRevealed ? (record.secret || "—") : "•".repeat(18)}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(record)}
+                          title={isCopied ? "Copied" : "Copy"}
+                          className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          {isCopied ? (
+                            <ClipboardCheck className="size-3.5 text-primary" />
+                          ) : (
+                            <Copy className="size-3.5" />
+                          )}
+                        </button>
+                      </div>
                     ) : null}
                   </div>
 

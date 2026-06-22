@@ -92,6 +92,51 @@ function isOptimisticRecord(recordId: string) {
   return recordId.startsWith("optimistic-");
 }
 
+async function writeClipboardText(value: string) {
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch {
+    const el = document.createElement("textarea");
+    el.value = value;
+    el.style.cssText = "position:fixed;opacity:0";
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand("copy");
+    document.body.removeChild(el);
+  }
+}
+
+function InlineCopyButton({
+  fieldKey,
+  value,
+  copiedField,
+  onCopy,
+}: {
+  fieldKey: string;
+  value: string;
+  copiedField: string | null;
+  onCopy: (key: string, value: string) => void;
+}) {
+  const copied = copiedField === fieldKey;
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onCopy(fieldKey, value);
+      }}
+      title={copied ? "Copied" : "Copy"}
+      className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+    >
+      {copied ? (
+        <ClipboardCheck className="size-3.5 text-primary" />
+      ) : (
+        <Copy className="size-3.5" />
+      )}
+    </button>
+  );
+}
+
 function resolveNotePreview(record: RecordItem, revealedSecret?: string) {
   if (record.hasEncryptedContent) {
     return revealedSecret ?? "Hidden note content";
@@ -137,6 +182,9 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
   const [revealingId, setRevealingId] = useState<string | null>(null);
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copyingId, setCopyingId] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const fieldCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editRecord, setEditRecord] = useState<RecordItem | null>(null);
   const [editLoadingId, setEditLoadingId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -189,48 +237,65 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
     }
   }
 
-  const handleCopy = useCallback(async (record: RecordItem) => {
-    if (record.type === "secure_note" && !record.hasEncryptedContent) {
-      const value = record.notes || "";
-      if (!value) return;
+  const copyFieldValue = useCallback(async (key: string, value: string) => {
+    if (!value) return;
 
-      try {
-        await navigator.clipboard.writeText(value);
-      } catch {
-        const el = document.createElement("textarea");
-        el.value = value;
-        el.style.cssText = "position:fixed;opacity:0";
-        document.body.appendChild(el);
-        el.select();
-        document.execCommand("copy");
-        document.body.removeChild(el);
+    await writeClipboardText(value);
+
+    if (fieldCopyTimeoutRef.current) clearTimeout(fieldCopyTimeoutRef.current);
+    setCopiedField(key);
+    fieldCopyTimeoutRef.current = setTimeout(() => setCopiedField(null), 1500);
+  }, []);
+
+  const handleCopy = useCallback(async (record: RecordItem) => {
+    setCopyingId(record.id);
+    try {
+      if (record.type === "secure_note" && !record.hasEncryptedContent) {
+        const value = record.notes || "";
+        if (!value) return;
+
+        await writeClipboardText(value);
+
+        if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+        setCopiedId(record.id);
+        copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 2000);
+        return;
+      }
+
+      // Kick off the decrypt fetch and hand the Clipboard API a pending promise
+      // immediately (no preceding await) — fetching the secret first and only
+      // then calling the clipboard API loses the click's user-activation after
+      // the server round-trip, so the write silently fails when the secret
+      // hasn't been revealed/cached yet.
+      const secretPromise = copySecret(record.id);
+
+      let wroteViaClipboardItem = false;
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              "text/plain": secretPromise.then((value) => new Blob([value || ""], { type: "text/plain" })),
+            }),
+          ]);
+          wroteViaClipboardItem = true;
+        } catch {
+          // fall through to the legacy path below
+        }
+      }
+
+      if (!wroteViaClipboardItem) {
+        const value = await secretPromise;
+        if (!value) return;
+        await writeClipboardText(value);
       }
 
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       setCopiedId(record.id);
       copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 2000);
-      return;
+      emitLiveAuditEvent({ action: "SECRET_COPIED", targetLabel: record.title });
+    } finally {
+      setCopyingId(null);
     }
-
-    const value = await copySecret(record.id);
-    if (!value) return;
-
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
-      const el = document.createElement("textarea");
-      el.value = value;
-      el.style.cssText = "position:fixed;opacity:0";
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand("copy");
-      document.body.removeChild(el);
-    }
-
-    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-    setCopiedId(record.id);
-    copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 2000);
-    emitLiveAuditEvent({ action: "SECRET_COPIED", targetLabel: record.title });
   }, []);
 
   async function handleOpenRecord(record: RecordItem) {
@@ -683,6 +748,7 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
               const isRevealed = secret !== undefined;
               const isRevealing = revealingId === record.id;
               const isCopied = copiedId === record.id;
+              const isCopying = copyingId === record.id;
               const isNote = record.type === "secure_note";
               const isEnvFile = record.type === "env_file";
               const isOptimistic = isOptimisticRecord(record.id);
@@ -780,6 +846,12 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                                 >
                                   {record.serviceName || record.url}
                                 </a>
+                                <InlineCopyButton
+                                  fieldKey={`${record.id}:url`}
+                                  value={record.url}
+                                  copiedField={copiedField}
+                                  onCopy={copyFieldValue}
+                                />
                               </div>
                             ) : record.serviceName ? (
                               <div className="flex items-baseline gap-2">
@@ -792,6 +864,12 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                               <div className="flex items-baseline gap-2">
                                 <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">Username</span>
                                 <span className="min-w-0 truncate text-sm text-foreground">{record.username}</span>
+                                <InlineCopyButton
+                                  fieldKey={`${record.id}:username`}
+                                  value={record.username}
+                                  copiedField={copiedField}
+                                  onCopy={copyFieldValue}
+                                />
                               </div>
                             )}
                           </div>
@@ -801,7 +879,10 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                               {secretDisplay}
                             </pre>
                           ) : (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-baseline gap-2">
+                              {!isEnvFile && (
+                                <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">Password</span>
+                              )}
                               <code
                                 className={`rounded-lg border border-border/50 bg-muted/60 px-2.5 py-1 text-xs ${
                                   isRevealed
@@ -811,6 +892,24 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                               >
                                 {secretDisplay}
                               </code>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopy(record);
+                                }}
+                                disabled={isCopying}
+                                title={isCopied ? "Copied" : "Copy"}
+                                className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                              >
+                                {isCopying ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : isCopied ? (
+                                  <ClipboardCheck className="size-3.5 text-primary" />
+                                ) : (
+                                  <Copy className="size-3.5" />
+                                )}
+                              </button>
                             </div>
                           )}
                         </>
@@ -860,25 +959,29 @@ export function RecordList({ projectId, initialRecords, categories }: RecordList
                         )}
                       </Button>
 
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleCopy(record)}
-                        className="transition-all"
-                        disabled={isOptimistic}
-                      >
-                        {isCopied ? (
-                          <>
-                            <ClipboardCheck className="size-4 text-primary" />
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="size-4" />
-                            Copy
-                          </>
-                        )}
-                      </Button>
+                      {(isNote || isEnvFile) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleCopy(record)}
+                          className="transition-all"
+                          disabled={isOptimistic || isCopying}
+                        >
+                          {isCopying ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : isCopied ? (
+                            <>
+                              <ClipboardCheck className="size-4 text-primary" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="size-4" />
+                              Copy
+                            </>
+                          )}
+                        </Button>
+                      )}
 
                       {isEnvFile ? (
                         <>

@@ -2,9 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getCurrentRole } from "@/lib/auth/get-role";
+import { getCurrentRole, getCurrentUserRecord } from "@/lib/auth/get-role";
 import { prisma as db } from "@/lib/db";
-import { auth } from "@clerk/nextjs/server";
 import type { ProjectRow } from "@/lib/actions/projects";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -52,33 +51,24 @@ async function migrateOrphans() {
 }
 
 export async function getCurrentDbUserId() {
-  const { userId: clerkUserId } = await auth();
-  if (!clerkUserId) return null;
-
-  const user = await db.user.findUnique({
-    where: { clerkUserId },
-    select: { id: true },
-  });
-
+  const user = await getCurrentUserRecord();
   return user?.id ?? null;
 }
 
 export async function getAccessibleCategoryIds(): Promise<string[]> {
-  const role = await getCurrentRole();
-  const currentUserId = await getCurrentDbUserId();
-
-  if (!currentUserId) return [];
+  const user = await getCurrentUserRecord();
+  if (!user) return [];
 
   const rows = await db.category.findMany({
     where:
-      role === "ADMIN"
+      user.role === "ADMIN"
         ? {
-            OR: [{ ownerId: null }, { ownerId: currentUserId }],
+            OR: [{ ownerId: null }, { ownerId: user.id }],
           }
         : {
             OR: [
-              { ownerId: currentUserId },
-              { ownerId: null, userAccess: { some: { userId: currentUserId } } },
+              { ownerId: user.id },
+              { ownerId: null, userAccess: { some: { userId: user.id } } },
             ],
           },
     select: { id: true },

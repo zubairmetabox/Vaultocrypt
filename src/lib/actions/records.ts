@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { AuditAction, RecordSensitivity, RecordType } from "@prisma/client";
 
 import { writeAudit } from "@/lib/audit";
@@ -104,14 +105,19 @@ export async function revealSecret(recordId: string): Promise<string> {
 
   if (record.isRestricted && role !== "ADMIN") throw new Error("Unauthorized");
 
-  await writeAudit({
-    action: AuditAction.SECRET_REVEALED,
-    resource: "record",
-    resourceId: recordId,
-    projectId: record.projectId,
-    recordId,
-    metadata: { recordTitle: record.title },
-  });
+  // Logged after the response is sent — the audit write still always
+  // happens (the serverless invocation is kept alive for it), it just no
+  // longer makes the user wait on it before seeing the revealed secret.
+  after(() =>
+    writeAudit({
+      action: AuditAction.SECRET_REVEALED,
+      resource: "record",
+      resourceId: recordId,
+      projectId: record.projectId,
+      recordId,
+      metadata: { recordTitle: record.title },
+    }),
+  );
   return record.secretCipher ? decrypt(record.secretCipher) : "";
 }
 
@@ -125,14 +131,16 @@ export async function copySecret(recordId: string): Promise<string> {
 
   if (record.isRestricted && role !== "ADMIN") throw new Error("Unauthorized");
 
-  await writeAudit({
-    action: AuditAction.SECRET_COPIED,
-    resource: "record",
-    resourceId: recordId,
-    projectId: record.projectId,
-    recordId,
-    metadata: { recordTitle: record.title },
-  });
+  after(() =>
+    writeAudit({
+      action: AuditAction.SECRET_COPIED,
+      resource: "record",
+      resourceId: recordId,
+      projectId: record.projectId,
+      recordId,
+      metadata: { recordTitle: record.title },
+    }),
+  );
   return record.secretCipher ? decrypt(record.secretCipher) : "";
 }
 

@@ -1,4 +1,7 @@
-import { FileText, KeyRound } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { ClipboardCheck, Copy, FileText, KeyRound } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +10,22 @@ import type { BundleDetail } from "@/lib/actions/sharing";
 type Props = { bundle: BundleDetail };
 
 export function BundleRecordsCard({ bundle }: Props) {
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  async function copyFieldValue(key: string, value: string) {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      const el = document.createElement("textarea");
+      el.value = value; el.style.cssText = "position:fixed;opacity:0";
+      document.body.appendChild(el); el.select();
+      document.execCommand("copy"); document.body.removeChild(el);
+    }
+    setCopiedField(key);
+    setTimeout(() => setCopiedField((p) => (p === key ? null : p)), 1500);
+  }
+
   return (
     <Card className="border-border/70 bg-card/95">
       <CardHeader>
@@ -69,6 +88,18 @@ export function BundleRecordsCard({ bundle }: Props) {
                       >
                         {record.serviceName || record.url}
                       </a>
+                      <button
+                        type="button"
+                        onClick={() => copyFieldValue(`${record.id}:url`, record.url || "")}
+                        title={copiedField === `${record.id}:url` ? "Copied" : "Copy"}
+                        className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {copiedField === `${record.id}:url` ? (
+                          <ClipboardCheck className="size-3.5 text-primary" />
+                        ) : (
+                          <Copy className="size-3.5" />
+                        )}
+                      </button>
                     </div>
                   )}
                   {!record.url && record.serviceName && (
@@ -81,6 +112,18 @@ export function BundleRecordsCard({ bundle }: Props) {
                     <div className="flex items-baseline gap-2">
                       <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">Username</span>
                       <span className="min-w-0 truncate text-sm text-foreground">{record.username}</span>
+                      <button
+                        type="button"
+                        onClick={() => copyFieldValue(`${record.id}:username`, record.username || "")}
+                        title={copiedField === `${record.id}:username` ? "Copied" : "Copy"}
+                        className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {copiedField === `${record.id}:username` ? (
+                          <ClipboardCheck className="size-3.5 text-primary" />
+                        ) : (
+                          <Copy className="size-3.5" />
+                        )}
+                      </button>
                     </div>
                   )}
                   <div className="flex items-baseline gap-2">

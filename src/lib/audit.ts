@@ -1,46 +1,16 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
 import { AuditAction } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
+import { getCurrentUserRecord } from "@/lib/auth/get-role";
 
 async function resolveActorId(): Promise<string | null> {
   try {
-    const { userId: clerkUserId } = await auth();
-    if (!clerkUserId) return null;
-
-    const clerkUser = await currentUser();
-    if (!clerkUser) return null;
-
-    const primaryEmail =
-      clerkUser.emailAddresses.find(
-        (e) => e.id === clerkUser.primaryEmailAddressId,
-      )?.emailAddress ?? null;
-
-    // 1. Try to find an existing record by clerkUserId
-    let user = await prisma.user.findUnique({
-      where: { clerkUserId },
-      select: { id: true },
-    });
-
-    if (!user && primaryEmail) {
-      // 2. Check for a pre-added stub with this email but no clerkUserId yet
-      const stub = await prisma.user.findFirst({
-        where: { email: primaryEmail, clerkUserId: null },
-        select: { id: true },
-      });
-
-      if (stub) {
-        // Link the stub to this Clerk account on first action
-        await prisma.user.update({
-          where: { id: stub.id },
-          data: { clerkUserId, firstName: clerkUser.firstName, lastName: clerkUser.lastName },
-        });
-        user = stub;
-      }
-    }
-
-    // Do NOT auto-create users here — only admins can add users to the system.
-    // Access control is enforced in getCurrentRole().
+    // Reuses the same request-cached lookup that getCurrentRole/
+    // getCurrentDbUserId already trigger — by the time an audit event is
+    // written, the user (incl. any stub-linking/bootstrap) has already
+    // been resolved, so this is free rather than a second Clerk API call
+    // plus a duplicate DB query.
+    const user = await getCurrentUserRecord();
     return user?.id ?? null;
   } catch {
     return null;
